@@ -356,6 +356,7 @@ table.inv .c-del,table.his .c-act{width:auto}
 <symbol id="i-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
 <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+<symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
 <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8"/></symbol>
 </svg>
 <header class="top">
@@ -386,6 +387,9 @@ table.inv .c-del,table.his .c-act{width:auto}
       </button>
       <button class="btn btn--dark btn--sm" type="button" data-action="pull" aria-label="Tải dữ liệu từ Cloud">
         <svg class="ico" aria-hidden="true"><use href="#i-cloud-down"/></svg><span class="hide-sm">Tải Cloud</span>
+      </button>
+      <button class="btn btn--sm" type="button" data-action="logout" aria-label="Đăng xuất">
+        <svg class="ico" aria-hidden="true"><use href="#i-logout"/></svg><span class="hide-sm">Thoát</span>
       </button>
     </div>
   </div>
@@ -3200,6 +3204,19 @@ function saveTxEdit(){
   commit('Đã cập nhật giao dịch');
 }
 /* ================= ĐỒNG BỘ CLOUD ================= */
+var authReloading = false;
+function authExpired(){
+  if (authReloading) return false;
+  authReloading = true;
+  toast('Phiên đăng nhập đã hết hạn. Đang tải lại trang…', 'error');
+  setTimeout(function(){ location.reload(); }, 900);
+  return false;
+}
+function doLogout(){
+  fetch('/logout', { method: 'POST', cache: 'no-store' })
+    .then(function(){ location.reload(); })
+    .catch(function(){ location.reload(); });
+}
 function cloudConflict(){
   if (conflictOpen) return Promise.resolve(false);
   conflictOpen = true;
@@ -3218,7 +3235,11 @@ function pushCloud(manual, force){
     headers: headers,
     body: JSON.stringify(db),
     cache: 'no-store'
-  }).then(function(r){ return r.json(); }).then(function(d){
+  }).then(function(r){
+    if (r.status === 401) { authExpired(); return { authFail: true }; }
+    return r.json();
+  }).then(function(d){
+    if (d && d.authFail) return false;
     if (d && d.conflict) return cloudConflict();
     var ok = !!(d && d.success);
     if (ok) cloudBase = sent;
@@ -3231,8 +3252,12 @@ function pushCloud(manual, force){
 }
 function pullCloud(manual, forceCloud){
   return fetch('/sync?t=' + Date.now(), { cache: 'no-store' })
-    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (r.status === 401) { authExpired(); return { authFail: true }; }
+      return r.json();
+    })
     .then(function(d){
+      if (d && d.authFail) return;
       var cloud = d && d.success ? sanitize(d.data) : null;
       if (!cloud || !cloud.updatedAt) {
         if (manual) toast('Cloud chưa có dữ liệu');
@@ -3365,6 +3390,7 @@ function handleAction(btn){
       break;
     }
     case 'push': pushCloud(true); break;
+    case 'logout': doLogout(); break;
     case 'pull': pullCloud(true); break;
     case 'save-retail': saveRetail(); break;
     case 'save-remedy': saveRemedy(); break;
@@ -3711,65 +3737,201 @@ function securityHeaders(n){
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), payment=()',
     'Cross-Origin-Opener-Policy': 'same-origin',
-    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'X-Robots-Tag': 'noindex, nofollow'
   };
+}
+
+/* ============================ ĐĂNG NHẬP ============================ */
+
+const SESSION_COOKIE = 'qlk_session';
+const SESSION_SECONDS = 30 * 24 * 3600;
+const MAX_FAILS = 5;
+const FAIL_WINDOW = 900;
+const ENC = new TextEncoder();
+
+function b64url(bytes){
+  let t = '';
+  for (let i = 0; i < bytes.length; i++) t += String.fromCharCode(bytes[i]);
+  return btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function hmac(secret, msg){
+  const key = await crypto.subtle.importKey(
+    'raw', ENC.encode('qlk-auth-v1|' + secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  return b64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, ENC.encode(msg))));
+}
+function safeEq(a, b){
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+async function checkPassword(secret, input){
+  return safeEq(await hmac(secret, 'pw|' + input), await hmac(secret, 'pw|' + secret));
+}
+async function makeToken(secret){
+  const exp = String(Date.now() + SESSION_SECONDS * 1000);
+  return exp + '.' + await hmac(secret, 'sess|' + exp);
+}
+async function checkToken(secret, token){
+  if (!token) return false;
+  const i = token.indexOf('.');
+  if (i < 1) return false;
+  const exp = token.slice(0, i);
+  const sig = token.slice(i + 1);
+  if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
+  return safeEq(sig, await hmac(secret, 'sess|' + exp));
+}
+function getCookie(request, name){
+  const parts = (request.headers.get('Cookie') || '').split(';');
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i].trim();
+    if (p.indexOf(name + '=') === 0) return p.slice(name.length + 1);
+  }
+  return '';
+}
+function cookieHeader(value, maxAge, secure){
+  return SESSION_COOKIE + '=' + value + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=' + maxAge + (secure ? '; Secure' : '');
+}
+async function failCount(kv, ip){
+  try {
+    const raw = await kv.get('rl:' + ip);
+    return raw ? (parseInt(raw, 10) || 0) : 0;
+  } catch (e) { return 0; }
+}
+async function failAdd(kv, ip){
+  try {
+    const n = (await failCount(kv, ip)) + 1;
+    await kv.put('rl:' + ip, String(n), { expirationTtl: FAIL_WINDOW });
+  } catch (e) {}
+}
+async function failClear(kv, ip){
+  try { await kv.delete('rl:' + ip); } catch (e) {}
+}
+function jsonRes(obj, status){
+  return new Response(JSON.stringify(obj), {
+    status: status || 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
+}
+
+function authPage(kind, message, status, method){
+  const n = nonce();
+  const setup = kind === 'setup';
+  const body = setup
+    ? '<h1>Chưa đặt mật khẩu</h1>' +
+      '<p>Ứng dụng đang bị khóa cho tới khi bạn đặt mật khẩu.</p>' +
+      '<ol><li>Mở Cloudflare, vào <b>Workers &amp; Pages</b>, chọn <b>quan-ly-kho</b>.</li>' +
+      '<li>Vào <b>Settings</b>, mục <b>Variables and Secrets</b>, bấm <b>Add</b>.</li>' +
+      '<li>Chọn Type là <b>Secret</b>, đặt tên <b>APP_PASSWORD</b>, nhập mật khẩu rồi Deploy.</li>' +
+      '<li>Tải lại trang này.</li></ol>'
+    : '<h1>Quản Lý Kho</h1><p>Nhập mật khẩu để tiếp tục.</p>' +
+      (message ? '<div class="err" role="alert">' + message + '</div>' : '') +
+      '<form method="post" action="/login">' +
+      '<label for="pw">Mật khẩu</label>' +
+      '<input id="pw" name="password" type="password" autocomplete="current-password" maxlength="256" required autofocus>' +
+      '<button type="submit">Đăng nhập</button></form>';
+  const html = '<!doctype html><html lang="vi"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="robots" content="noindex,nofollow"><meta name="color-scheme" content="light dark">' +
+    '<title>Đăng nhập · Quản Lý Kho</title><style nonce="' + n + '">' +
+    ':root{--bg:#f5f7fa;--sf:#fff;--tx:#0f172a;--mu:#5b6b81;--bd:#e3e8ef;--er:#be123c;--ers:#fff1f2}' +
+    '@media (prefers-color-scheme:dark){:root{--bg:#0b1120;--sf:#111827;--tx:#e5e7eb;--mu:#94a3b8;--bd:#273449;--er:#fda4af;--ers:#3b1320}}' +
+    '*{box-sizing:border-box}' +
+    'body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}' +
+    '.card{width:100%;max-width:380px;background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:24px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 2px 8px rgba(15,23,42,.05)}' +
+    'h1{margin:0 0 4px;font-size:20px}p{margin:0 0 16px;color:var(--mu);font-size:14px}ol{margin:0;padding-left:20px;color:var(--mu);font-size:14px}li{margin-bottom:6px}' +
+    'label{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mu);margin-bottom:5px}' +
+    'input{width:100%;min-height:44px;padding:8px 12px;font:inherit;color:var(--tx);background:var(--sf);border:1px solid var(--bd);border-radius:10px}' +
+    'button{width:100%;min-height:44px;margin-top:14px;font:inherit;font-weight:700;color:#fff;background:#4f46e5;border:0;border-radius:10px;cursor:pointer}' +
+    'input:focus-visible,button:focus-visible{outline:3px solid rgba(79,70,229,.4);outline-offset:1px}' +
+    '.err{margin:0 0 14px;padding:9px 12px;border-radius:10px;background:var(--ers);color:var(--er);font-size:14px}' +
+    '</style></head><body><main class="card">' + body + '</main></body></html>';
+  return new Response(method === 'HEAD' ? null : html, {
+    status: status || 200,
+    headers: Object.assign({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }, securityHeaders(n))
+  });
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const method = request.method;
+    const secret = env && env.APP_PASSWORD ? String(env.APP_PASSWORD) : '';
+    const secure = url.protocol === 'https:';
+    const kv = env && env.KV;
 
-    if (method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type'
-        }
-      });
-    }
+    // Không cho website khác gọi API (không còn CORS).
+    if (method === 'OPTIONS') return new Response(null, { status: 204 });
 
     if (url.pathname === '/favicon.ico') {
       return new Response(null, { status: 204, headers: { 'Cache-Control': 'public, max-age=86400' } });
     }
 
     if (url.pathname === '/robots.txt') {
-      return new Response('User-agent: *\nDisallow: /sync\n', {
+      return new Response('User-agent: *\nDisallow: /\n', {
         headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' }
       });
     }
 
+    // ---------- Đăng nhập / đăng xuất ----------
+    if (url.pathname === '/login') {
+      if (!secret) return authPage('setup', '', 503, method);
+      if (method === 'GET' || method === 'HEAD') {
+        if (await checkToken(secret, getCookie(request, SESSION_COOKIE))) {
+          return new Response(null, { status: 303, headers: { Location: '/', 'Cache-Control': 'no-store' } });
+        }
+        return authPage('login', '', 200, method);
+      }
+      if (method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return new Response('Forbidden', { status: 403 });
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      if (kv && (await failCount(kv, ip)) >= MAX_FAILS) {
+        return authPage('login', 'Thử sai quá nhiều lần. Vui lòng đợi 15 phút rồi thử lại.', 429, 'GET');
+      }
+      let pw = '';
+      try {
+        const form = await request.formData();
+        pw = String(form.get('password') || '');
+      } catch (e) { pw = ''; }
+      if (pw && pw.length <= 256 && (await checkPassword(secret, pw))) {
+        if (kv) await failClear(kv, ip);
+        const token = await makeToken(secret);
+        return new Response(null, {
+          status: 303,
+          headers: { Location: '/', 'Cache-Control': 'no-store', 'Set-Cookie': cookieHeader(token, SESSION_SECONDS, secure) }
+        });
+      }
+      if (kv) await failAdd(kv, ip);
+      await new Promise(function(r){ setTimeout(r, 400); });
+      return authPage('login', 'Mật khẩu không đúng.', 401, 'GET');
+    }
+
+    if (url.pathname === '/logout') {
+      if (method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return new Response('Forbidden', { status: 403 });
+      return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store', 'Set-Cookie': cookieHeader('', 0, secure) } });
+    }
+
+    const authed = secret ? await checkToken(secret, getCookie(request, SESSION_COOKIE)) : false;
+
+    // ---------- Đồng bộ dữ liệu (cần đăng nhập) ----------
     if (url.pathname === '/sync') {
-      const kv = env && env.KV;
+      if (!authed) return jsonRes({ success: false, auth: true, error: 'Cần đăng nhập' }, 401);
       try {
         if (method === 'GET') {
           const raw = kv ? await kv.get(KV_KEY) : null;
           const data = raw ? JSON.parse(raw) : null;
-          return new Response(JSON.stringify({ success: true, data }), {
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              'Cache-Control': 'no-store',
-              'Access-Control-Allow-Origin': '*'
-            }
-          });
+          return jsonRes({ success: true, data });
         }
         if (method === 'POST') {
           const len = Number(request.headers.get('content-length') || 0);
-          if (len > MAX_BODY) {
-            return new Response(JSON.stringify({ success: false, error: 'Payload too large' }), {
-              status: 413,
-              headers: { 'Content-Type': 'application/json; charset=utf-8' }
-            });
-          }
+          if (len > MAX_BODY) return jsonRes({ success: false, error: 'Payload too large' }, 413);
           const text = await request.text();
-          if (text.length > MAX_BODY) {
-            return new Response(JSON.stringify({ success: false, error: 'Payload too large' }), {
-              status: 413,
-              headers: { 'Content-Type': 'application/json; charset=utf-8' }
-            });
-          }
+          if (text.length > MAX_BODY) return jsonRes({ success: false, error: 'Payload too large' }, 413);
           const body = JSON.parse(text);
           if (!kv) throw new Error('KV chưa được cấu hình');
           const baseHdr = request.headers.get('X-Base-Updated');
@@ -3780,28 +3942,16 @@ export default {
               let cur = null;
               if (curRaw) { try { cur = JSON.parse(curRaw); } catch (e) { cur = null; } }
               if (cur && Number(cur.updatedAt) > baseNum) {
-                return new Response(JSON.stringify({ success: false, conflict: true, updatedAt: Number(cur.updatedAt) }), {
-                  status: 409,
-                  headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
-                });
+                return jsonRes({ success: false, conflict: true, updatedAt: Number(cur.updatedAt) }, 409);
               }
             }
           }
           await kv.put(KV_KEY, JSON.stringify(body));
-          return new Response(JSON.stringify({ success: true }), {
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              'Cache-Control': 'no-store',
-              'Access-Control-Allow-Origin': '*'
-            }
-          });
+          return jsonRes({ success: true });
         }
         return new Response('Method Not Allowed', { status: 405 });
       } catch (err) {
-        return new Response(JSON.stringify({ success: false, error: err.message }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
-        });
+        return jsonRes({ success: false, error: err.message }, 500);
       }
     }
 
@@ -3809,10 +3959,14 @@ export default {
       return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
     }
 
+    // ---------- Trang chính (cần đăng nhập) ----------
+    if (!secret) return authPage('setup', '', 503, method);
+    if (!authed) return authPage('login', '', 200, method);
+
     let data = null;
     let kvFailed = false;
     try {
-      const raw = env && env.KV ? await env.KV.get(KV_KEY) : null;
+      const raw = kv ? await kv.get(KV_KEY) : null;
       data = raw ? JSON.parse(raw) : null;
     } catch (e) {
       data = null;
@@ -3830,8 +3984,8 @@ export default {
     return new Response(method === 'HEAD' ? null : html, {
       headers: Object.assign({
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'private, max-age=0, must-revalidate',
-        'Vary': 'Accept-Encoding'
+        'Cache-Control': 'private, no-store',
+        'Vary': 'Accept-Encoding, Cookie'
       }, securityHeaders(n))
     });
   }

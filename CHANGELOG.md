@@ -5,6 +5,34 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.3.0] - 2026-11-03
+
+Bản cập nhật bảo mật: ứng dụng yêu cầu đăng nhập bằng mật khẩu.
+
+### Thêm mới
+
+- **Đăng nhập bằng mật khẩu**: khi chưa đăng nhập chỉ thấy trang nhập mật khẩu; không
+  xem được trang chính, không đọc hay ghi được dữ liệu qua `/sync`. Đăng nhập một lần
+  được ghi nhớ 30 ngày trên từng thiết bị.
+- **Nút Thoát** ở thanh trên cùng để đăng xuất.
+- **Chặn dò mật khẩu**: sai quá 5 lần từ cùng một địa chỉ IP sẽ bị khóa 15 phút.
+- Khi phiên đăng nhập hết hạn lúc đang dùng, app báo và tải lại về trang đăng nhập.
+
+### Thay đổi
+
+- Mật khẩu đặt bằng secret `APP_PASSWORD` trên Cloudflare (không nằm trong mã nguồn
+  hay trên GitHub). Chưa đặt secret thì ứng dụng bị khóa và hiện hướng dẫn đặt mật khẩu.
+- Đổi `APP_PASSWORD` sẽ làm mọi thiết bị đang đăng nhập phải đăng nhập lại.
+- Bỏ CORS `*` của API; `robots.txt` chặn toàn bộ; trang gửi `X-Robots-Tag: noindex`.
+
+### Kỹ thuật
+
+- Phiên đăng nhập là cookie `qlk_session` (`HttpOnly`, `SameSite=Strict`, `Secure`) ký
+  HMAC-SHA256 từ mật khẩu; so sánh mật khẩu và chữ ký theo thời gian không đổi.
+- `POST /login`, `POST /logout` kiểm tra `Origin` cùng nguồn. Đếm số lần sai lưu trong
+  KV với khóa `rl:<ip>` (tự xóa sau 15 phút).
+- `GET/POST /sync` trả `401` khi chưa đăng nhập.
+
 ## [1.2.0] - 2026-11-03
 
 Bản cập nhật tập trung vào độ chính xác của dữ liệu (đối chiếu tồn kho, cảnh báo
