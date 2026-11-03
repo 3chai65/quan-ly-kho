@@ -4,10 +4,21 @@ on:
   push:
     branches:
       - main
+  # Cho phép bấm chạy tay trong tab Actions
+  workflow_dispatch:
+
+# Không chạy 2 lần deploy cùng lúc
+concurrency:
+  group: deploy-quan-ly-kho
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -16,5 +27,6 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Chỉ thêm dòng dưới nếu báo lỗi không tìm thấy account (tạo secret CLOUDFLARE_ACCOUNT_ID):
+          # accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
-          # Nếu bạn có file wrangler.toml cấu hình tên worker riêng, wrangler-action sẽ tự nhận diện

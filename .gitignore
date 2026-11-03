@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+.dev.vars
+.env
+# File sao lưu dữ liệu bán hàng: không đưa lên GitHub
+kho-backup-*.json
+*.log

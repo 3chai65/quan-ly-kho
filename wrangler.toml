@@ -1,3 +1,7 @@
 name = "quan-ly-kho"
 main = "worker.js"
 compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "59645293dd5b48348edf19a901ce19d3"
