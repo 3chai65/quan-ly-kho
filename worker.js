@@ -1041,7 +1041,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
       <p class="hint mt-10" id="txEditMeta"></p>
       <div class="grid2 mt-12 gap-12">
         <div class="field">
-          <label class="lbl" for="txEditQty">Số lượng (kg)</label>
+          <label class="lbl" for="txEditQty" id="txEditQtyLbl">Số lượng (kg)</label>
           <input class="inp inp--num" id="txEditQty" type="number" step="any" min="0" inputmode="decimal">
         </div>
         <div class="field">
@@ -1079,6 +1079,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
             <th scope="col" id="orderQtyHead">SL</th>
             <th class="r" scope="col" id="orderPriceHead" hidden>Đơn giá</th>
             <th class="r" scope="col" id="orderMoneyHead" hidden>Thành tiền</th>
+            <th class="c-act" scope="col"><span class="sr">Thao tác</span></th>
           </tr></thead>
           <tbody id="orderBody"></tbody>
           <tfoot><tr>
@@ -1086,6 +1087,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
             <td class="num txt-green" id="orderFootQty">0</td>
             <td class="num txt-green r" id="orderFootPrice" hidden></td>
             <td class="num txt-green r" id="orderFootMoney" hidden>0</td>
+            <td class="c-act"></td>
           </tr></tfoot>
         </table>
         <div class="foot" id="orderPager" hidden></div>
@@ -2028,6 +2030,7 @@ function copyPreset(){
 function commit(msg){
   touch();
   renderAll();
+  if (orderCur) renderOrder();
   pushCloud(false);
   if (msg) toast(msg);
 }
@@ -2362,7 +2365,8 @@ function renderOrder(){
     return t.oid && String(t.oid) === String(orderCur);
   });
   var tb = $('#orderBody');
-  if (!items.length || !tb) return;
+  if (!items.length) { closeOrder(); return; }
+  if (!tb) return;
   var first = items[0];
   var isImp = first.type === 'NHAP';
   var oname = first.oname || '';
@@ -2447,6 +2451,12 @@ function renderOrder(){
       if (isImp) tr.appendChild(el('td', 'num r', fmtUnitPrice(t.price)));
       tr.appendChild(el('td', 'num r b ' + (isImp ? 'txt-blue' : 'txt-green'), fmtMoney(t.total)));
     }
+    var tdA = el('td', 'c-act');
+    tdA.appendChild(rowMenu([
+      { label: 'Sửa dòng', icon: 'edit', action: 'tx-edit', id: t.id },
+      { label: 'Xóa dòng', icon: 'trash', action: 'del-tx', id: t.id, danger: true }
+    ], 'Thao tác với dòng ' + (i + 1)));
+    tr.appendChild(tdA);
     tb.appendChild(tr);
   });
   var pg = $('#orderNotePg');
@@ -3461,6 +3471,11 @@ function delOrder(oid){
   db.transactions = db.transactions.filter(function(x){ return x.oid !== oid; });
   commit('Đã xóa đơn');
 }
+function txEditKg(t, qRaw){
+  if (!t || !t.rx) return dec(qRaw);
+  var thang = num(t.thang) > 0 ? num(t.thang) : 1;
+  return dec(qRaw / 1000 * thang);
+}
 function openTxEdit(id){
   var t = findTx(id);
   if (!t) return;
@@ -3468,10 +3483,13 @@ function openTxEdit(id){
   var p = findProduct(t.productId);
   $('#txEditId').value = t.id;
   $('#txEditName').value = p ? p.name : 'Đã xóa';
-  $('#txEditQty').value = String(dec(t.qty));
+  var isRx = !!t.rx;
+  var lbl = $('#txEditQtyLbl');
+  if (lbl) lbl.textContent = isRx ? 'Số gram (mỗi thang)' : 'Số lượng (kg)';
+  $('#txEditQty').value = String(isRx ? num(t.g) : dec(t.qty));
   $('#txEditPrice').value = String(dec(t.price));
   var meta = $('#txEditMeta');
-  if (meta) meta.textContent = (t.type === 'NHAP' ? 'Nhập hàng' : 'Bán hàng') + ' · ngày ' +
+  if (meta) meta.textContent = (t.rx ? 'Đơn thuốc chén' : t.type === 'NHAP' ? 'Nhập hàng' : 'Bán hàng') + ' · ngày ' +
     dateVN(t.date) + (txHasTime(t) ? ' ' + timeVN(txStamp(t)) : '');
   calcTxEdit();
   var d = $('#txDlg');
@@ -3481,7 +3499,7 @@ function calcTxEdit(){
   var q = num(($('#txEditQty') || {}).value);
   var p = num(($('#txEditPrice') || {}).value);
   var out = $('#txEditTotal');
-  if (out) out.textContent = fmtMoney(q * p);
+  if (out) out.textContent = fmtMoney(txEditKg(txEditCur, q) * p);
 }
 function closeTxEdit(){
   var d = $('#txDlg');
@@ -3491,9 +3509,11 @@ function closeTxEdit(){
 function saveTxEdit(){
   var t = txEditCur;
   if (!t) return;
-  var q = num($('#txEditQty').value);
+  var qRaw = num($('#txEditQty').value);
   var price = num($('#txEditPrice').value);
-  if (q <= 0) { toast('Số lượng phải lớn hơn 0', 'error'); return; }
+  if (qRaw <= 0) { toast('Số lượng phải lớn hơn 0', 'error'); return; }
+  var isRx = !!t.rx;
+  var q = txEditKg(t, qRaw);
 
   var p = findProduct(t.productId);
   var oldQty = num(t.qty);
@@ -3518,6 +3538,7 @@ function saveTxEdit(){
   t.qty = dec(q);
   t.price = dec(price);
   t.total = dec(q * price);
+  if (isRx) t.g = dec(qRaw);
   if (t.type === 'BAN') {
     t.cost = p ? dec(q * num(p.costPrice))
                : (oldQty > 0 ? dec(oldCost / oldQty * q) : oldCost);

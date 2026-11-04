@@ -5,6 +5,25 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.5.1] - 2026-11-04
+
+### Thêm mới
+
+- **Sửa từng dòng ngay trong hộp Chi tiết đơn** (cả đơn nhập lẫn đơn bán, kể cả đơn
+  thuốc chén): mỗi dòng có menu `···` → **Sửa dòng** / **Xóa dòng**.
+  - Đơn lẻ/bán lẻ/nhập: sửa *SL (kg)* + *Đơn giá*, tổng tiền tự tính lại.
+  - Đơn thuốc chén: sửa *Số gram (mỗi thang)* — nhãn và ô thật hiển thị theo gram,
+    không phải kg.
+  - Tồn kho, thống kê doanh thu/lợi nhuận và lịch sử tự điều chỉnh như thao tác
+    sửa/xóa giao dịch lẻ; đơn xóa hết dòng sẽ tự đóng.
+- Hộp *Chi tiết đơn* luôn hiển thị đúng: sửa/xóa từ lịch sử cũng tự làm mới hộp nếu
+  đang mở.
+
+### Sửa lỗi
+
+- Đơn gộp trước đây không có nút sửa/xóa từng dòng — chỉ xóa cả đơn (phải xóa rồi
+  nhập lại). Giờ sửa được ngay tại hộp chi tiết.
+
 ## [1.5.0] - 2026-11-04
 
 ### Thêm mới
