@@ -5,6 +5,28 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.7.0] - 2026-11-04
+
+### Thay đổi phá vỡ
+
+- **Dữ liệu chính chuyển từ Cloudflare KV sang Cloudflare D1**: app đọc/ghi `products`,
+  `transactions`, `prescriptions`, `prescription_items`, `ledger` trực tiếp trong D1.
+- **Không còn nút “Lưu Cloud” / “Tải Cloud”**: mỗi lần mở trang app tải dữ liệu mới nhất từ
+  máy chủ; các thao tác ghi sẽ tự lưu vào D1.
+- **Bỏ đồng bộ qua KV và localStorage làm nguồn chính**: localStorage chỉ còn là cache tạm,
+  dữ liệu chính nằm trong D1.
+- **Di chuyển dữ liệu hiện tại sang D1**: import từ bản KV mới nhất (142 sản phẩm,
+  432 giao dịch, 6 đơn thuốc chén).
+- App vẫn public, chưa có lớp đăng nhập; ai có link đều dùng được.
+
+### Kỹ thuật
+
+- Thêm D1 database `quan-ly-kho` với schema migration `migrations/0001_init.sql`.
+- Thêm `scripts/backup-to-sql.mjs` để import backup JSON vào D1.
+- Worker đọc/ghi D1 qua `/api/state`; `/sync` cũ đã bị thay thế.
+- Ghi dữ liệu dùng D1 batch, xóa/chèn lại toàn bộ snapshot trong một lần gọi.
+- Giữ KV binding trong cấu hình để có thể rollback nếu cần, nhưng app không còn dùng KV.
+
 ## [1.6.0] - 2026-11-04
 
 ### Thay đổi phá vỡ

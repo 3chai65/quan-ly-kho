@@ -13,7 +13,6 @@
  *  7. Font hệ thống -> không FOUT, không CLS.
  */
 
-const KV_KEY = "kho_data_v1";
 const MAX_BODY = 4 * 1024 * 1024;
 const MAX_INLINE = 200 * 1024;
 
@@ -386,7 +385,6 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
 <symbol id="i-chart-col" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M8 17V9M13 17V5M18 17v-4"/></symbol>
 <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z"/><path d="M9 7h6M9 11h6"/></symbol>
 <symbol id="i-mortar" viewBox="0 0 24 24"><path d="M3 10h18v2a9 9 0 0 1-18 0v-2z"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
-<symbol id="i-cloud-up" viewBox="0 0 24 24"><path d="M12 21v-8M8 17l4-4 4 4"/><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/></symbol>
 <symbol id="i-cloud-down" viewBox="0 0 24 24"><path d="M12 13v8M8 17l4 4 4-4"/><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/></symbol>
 <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></symbol>
 <symbol id="i-cash" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></symbol>
@@ -427,12 +425,6 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
           </button>
         </div>
       </div>
-      <button class="btn btn--primary btn--sm" type="button" data-action="push" aria-label="Lưu dữ liệu lên Cloud">
-        <svg class="ico" aria-hidden="true"><use href="#i-cloud-up"/></svg><span class="hide-sm">Lưu Cloud</span>
-      </button>
-      <button class="btn btn--dark btn--sm" type="button" data-action="pull" aria-label="Tải dữ liệu từ Cloud">
-        <svg class="ico" aria-hidden="true"><use href="#i-cloud-down"/></svg><span class="hide-sm">Tải Cloud</span>
-      </button>
     </div>
   </div>
 </header>
@@ -2027,7 +2019,7 @@ function commit(msg){
   touch();
   renderAll();
   if (orderCur) renderOrder();
-  pushCloud(false);
+  pushState(false);
   if (msg) toast(msg);
 }
 function saveRetail(){
@@ -3542,22 +3534,22 @@ function saveTxEdit(){
   closeTxEdit();
   commit('Đã cập nhật giao dịch');
 }
-/* ================= ĐỒNG BỘ CLOUD ================= */
+/* ================= ĐỒNG BỘ D1 ================= */
 function cloudConflict(){
   if (conflictOpen) return Promise.resolve(false);
   conflictOpen = true;
-  var useCloud = confirm('Cloud đã được lưu từ một thiết bị khác sau lần bạn mở trang này.\n\nOK: tải bản trên Cloud về (thay đổi chưa lưu của máy này sẽ mất).\nHủy: giữ bản trên máy này và ghi đè lên Cloud.');
+  var useLatest = confirm('Dữ liệu trên một thiết bị khác đã thay đổi sau lần bạn mở trang này.\n\nOK: tải bản mới nhất về (thay đổi chưa lưu của máy này sẽ mất).\nHủy: giữ bản trên máy này và ghi đè lên Cloud.');
   conflictOpen = false;
-  if (useCloud) return pullCloud(true, true).then(function(){ return false; });
-  return pushCloud(true, true);
+  if (useLatest) return pullState(true, true).then(function(){ return false; });
+  return pushState(true, true);
 }
-function pushCloud(manual, force){
+function pushState(manual, force){
   touch();
   var sent = num(db.updatedAt);
   var headers = { 'Content-Type': 'application/json', 'X-Base-Updated': String(cloudBase) };
   if (force) headers['X-Force'] = '1';
-  return fetch('/sync', {
-    method: 'POST',
+  return fetch('/api/state', {
+    method: 'PUT',
     headers: headers,
     body: JSON.stringify(db),
     cache: 'no-store'
@@ -3566,37 +3558,43 @@ function pushCloud(manual, force){
   }).then(function(d){
     if (d && d.conflict) return cloudConflict();
     var ok = !!(d && d.success);
-    if (ok) cloudBase = sent;
-    if (manual) toast(ok ? 'Đã lưu lên Cloud' : 'Lưu Cloud thất bại', ok ? 'ok' : 'error');
+    if (ok) {
+      cloudBase = num(d.updatedAt) || sent;
+      db.updatedAt = cloudBase;
+      saveLocal();
+    }
+    if (manual) toast(ok ? 'Đã lưu dữ liệu' : 'Lưu dữ liệu thất bại', ok ? 'ok' : 'error');
     return ok;
   }).catch(function(){
-    if (manual) toast('Không kết nối được Cloud', 'error');
+    if (manual) toast('Không kết nối được máy chủ', 'error');
     return false;
   });
 }
-function pullCloud(manual, forceCloud){
-  return fetch('/sync?t=' + Date.now(), { cache: 'no-store' })
+function pullState(manual, forceLatest){
+  return fetch('/api/state?t=' + Date.now(), { cache: 'no-store' })
     .then(function(r){
       return r.json();
     })
     .then(function(d){
-      var cloud = d && d.success ? sanitize(d.data) : null;
-      if (!cloud || !cloud.updatedAt) {
-        if (manual) toast('Cloud chưa có dữ liệu');
-        return;
+      var server = d && d.success ? sanitize(d.data) : null;
+      if (!server) {
+        if (manual) toast('Không tải được dữ liệu', 'error');
+        return false;
       }
-      cloudBase = num(cloud.updatedAt);
-      if (forceCloud || cloud.updatedAt >= num(db.updatedAt)) {
-        db = cloud;
+      cloudBase = num(server.updatedAt);
+      if (forceLatest || cloudBase >= num(db && db.updatedAt)) {
+        db = server;
         saveLocal();
         renderAll();
-        if (manual) toast('Đã tải dữ liệu mới nhất từ Cloud');
+        if (manual) toast('Đã tải dữ liệu mới nhất');
+        return true;
       } else {
-        pushCloud(false);
-        if (manual) toast('Dữ liệu trên máy mới hơn — đã đẩy lên Cloud');
+        pushState(false);
+        if (manual) toast('Dữ liệu trên máy mới hơn — đã lưu lên máy chủ');
+        return true;
       }
     })
-    .catch(function(){ if (manual) toast('Không tải được dữ liệu từ Cloud', 'error'); });
+    .catch(function(){ if (manual) toast('Không tải được dữ liệu', 'error'); return false; });
 }
 
 /* ================= SAO LƯU / KHÔI PHỤC ================= */
@@ -3714,8 +3712,6 @@ function handleAction(btn){
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
       break;
     }
-    case 'push': pushCloud(true); break;
-    case 'pull': pullCloud(true); break;
     case 'save-retail': saveRetail(); break;
     case 'save-remedy': saveRemedy(); break;
     case 'save-preset': savePreset(); break;
@@ -3980,12 +3976,8 @@ function bindEvents(){
 function init(){
   var remote = window.__DB__ ? sanitize(window.__DB__) : null;
   var local = readLocal();
-  var localNewer = local && num(local.updatedAt) > 0 && (!remote || num(local.updatedAt) > num(remote.updatedAt));
-  if (localNewer) db = local;
-  else if (remote && (remote.updatedAt || remote.products.length || remote.ledger.length)) db = remote;
-  else if (local) db = local;
-  else db = { products: [], transactions: [], prescriptions: [], ledger: [], updatedAt: 0 };
-  cloudBase = remote ? num(remote.updatedAt) : 0;
+  db = remote || local || { products: [], transactions: [], prescriptions: [], ledger: [], updatedAt: 0 };
+  cloudBase = remote ? num(remote.updatedAt) : num(db.updatedAt);
 
   var m = window.__THEME__ || 'system';
   applyTheme(m);
@@ -4011,10 +4003,8 @@ function init(){
   renderAll();
   renderBackupInfo();
 
-  if (window.__NEED_FETCH__) {
-    pullCloud(false);
-  } else if (localNewer && remote) {
-    pushCloud(false);
+  if (window.__NEED_FETCH__ || !remote) {
+    pullState(false, true);
   }
 
   var firstUse = function(){
@@ -4066,6 +4056,130 @@ function securityHeaders(n){
   };
 }
 
+function decNum(value){
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function decNullable(value){
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function getSourceUpdatedAt(db){
+  const row = await db.prepare("SELECT value FROM app_meta WHERE key = 'source_updated_at'").first();
+  return row ? Number(row.value) || 0 : 0;
+}
+
+async function readState(db){
+  const [productsResult, transactionsResult, prescriptionsResult, prescriptionItemsResult, ledgerResult, sourceUpdatedAt] = await Promise.all([
+    db.prepare('SELECT id, name, stock_kg AS stock, cost_price_vnd AS costPrice FROM products ORDER BY name COLLATE NOCASE').all(),
+    db.prepare('SELECT id, date, type, product_id AS productId, qty_kg AS qty, price_vnd AS price, total_vnd AS total, cost_vnd AS cost, order_id AS oid, order_name AS oname, retail, rx, grams AS g, thang, unit_price_vnd AS unitPrice, ts FROM transactions ORDER BY COALESCE(ts, 0) ASC, id ASC').all(),
+    db.prepare('SELECT id, name, total_vnd AS total, thang, updated_at AS updatedAt FROM prescriptions ORDER BY updated_at DESC').all(),
+    db.prepare('SELECT prescription_id AS prescriptionId, product_id AS productId, grams FROM prescription_items ORDER BY prescription_id, product_id').all(),
+    db.prepare('SELECT id, date, type, amount_vnd AS amount, category, ts FROM ledger ORDER BY ts DESC').all(),
+    getSourceUpdatedAt(db)
+  ]);
+  const itemsByPrescription = new Map();
+  for (const item of prescriptionItemsResult.results || []) {
+    const list = itemsByPrescription.get(item.prescriptionId) || [];
+    list.push({ productId: String(item.productId), grams: decNum(item.grams) });
+    itemsByPrescription.set(item.prescriptionId, list);
+  }
+  return {
+    products: (productsResult.results || []).map(p => ({ id: String(p.id), name: String(p.name), stock: decNum(p.stock), costPrice: decNum(p.costPrice) })),
+    transactions: (transactionsResult.results || []).map(t => {
+      const tx = {
+        id: String(t.id), date: String(t.date), type: t.type === 'NHAP' ? 'NHAP' : 'BAN',
+        productId: String(t.productId), qty: decNum(t.qty), price: decNum(t.price), total: decNum(t.total),
+        cost: decNullable(t.cost), oid: t.oid == null ? undefined : String(t.oid), oname: t.oname == null ? undefined : String(t.oname),
+        retail: !!Number(t.retail), rx: !!Number(t.rx), g: decNullable(t.g), thang: decNullable(t.thang),
+        unitPrice: decNullable(t.unitPrice), ts: decNullable(t.ts)
+      };
+      if (tx.cost == null) delete tx.cost;
+      if (tx.oid == null) delete tx.oid;
+      if (tx.oname == null) delete tx.oname;
+      if (!tx.retail) delete tx.retail;
+      if (!tx.rx) delete tx.rx;
+      if (tx.g == null) delete tx.g;
+      if (tx.thang == null) delete tx.thang;
+      if (tx.unitPrice == null) delete tx.unitPrice;
+      if (tx.ts == null) delete tx.ts;
+      return tx;
+    }),
+    prescriptions: (prescriptionsResult.results || []).map(r => ({ id: String(r.id), name: String(r.name), items: itemsByPrescription.get(r.id) || [], total: decNum(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt) })),
+    ledger: (ledgerResult.results || []).map(l => ({ id: String(l.id), date: String(l.date), type: l.type === 'CHI' ? 'CHI' : 'THU', amount: decNum(l.amount), category: String(l.category), ts: decNum(l.ts) })),
+    updatedAt: sourceUpdatedAt
+  };
+}
+
+function sanitizeState(d){
+  const out = { products: [], transactions: [], prescriptions: [], ledger: [], updatedAt: 0 };
+  if (!d || typeof d !== 'object') return out;
+  out.updatedAt = decNum(d.updatedAt);
+  for (const p of Array.isArray(d.products) ? d.products : []) {
+    if (!p || !p.name) continue;
+    out.products.push({ id: String(p.id || crypto.randomUUID()), name: String(p.name), stock: decNum(p.stock), costPrice: decNum(p.costPrice) });
+  }
+  for (const t of Array.isArray(d.transactions) ? d.transactions : []) {
+    if (!t) continue;
+    const tx = {
+      id: String(t.id || crypto.randomUUID()), date: String(t.date || ''), type: t.type === 'NHAP' ? 'NHAP' : 'BAN',
+      productId: String(t.productId || ''), qty: decNum(t.qty), price: decNum(t.price), total: decNum(t.total), cost: decNullable(t.cost),
+      orderId: t.oid == null ? null : String(t.oid), orderName: t.oname == null ? null : String(t.oname),
+      retail: !!t.retail, rx: !!t.rx, grams: decNullable(t.g), thang: decNullable(t.thang), unitPrice: decNullable(t.unitPrice), ts: decNullable(t.ts)
+    };
+    out.transactions.push(tx);
+  }
+  for (const r of Array.isArray(d.prescriptions) ? d.prescriptions : []) {
+    if (!r || !r.name || !Array.isArray(r.items)) continue;
+    const items = [];
+    for (const item of r.items) {
+      if (!item || !item.productId) continue;
+      items.push({ productId: String(item.productId), grams: decNum(item.grams) });
+    }
+    if (!items.length) continue;
+    out.prescriptions.push({ id: String(r.id || crypto.randomUUID()), name: String(r.name), items, total: decNum(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt) });
+  }
+  for (const l of Array.isArray(d.ledger) ? d.ledger : []) {
+    if (!l || !(decNum(l.amount) > 0)) continue;
+    out.ledger.push({ id: String(l.id || crypto.randomUUID()), date: String(l.date || ''), type: l.type === 'CHI' ? 'CHI' : 'THU', amount: decNum(l.amount), category: String(l.category || 'Khác'), ts: decNum(l.ts) });
+  }
+  return out;
+}
+
+async function writeState(db, data){
+  const state = sanitizeState(data);
+  const now = Date.now();
+  const statements = [
+    db.prepare('DELETE FROM prescription_items'),
+    db.prepare('DELETE FROM prescriptions'),
+    db.prepare('DELETE FROM transactions'),
+    db.prepare('DELETE FROM products'),
+    db.prepare('DELETE FROM ledger'),
+    db.prepare(`INSERT INTO app_meta (key, value) VALUES ('source_updated_at', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(String(now))
+  ];
+  for (const p of state.products) {
+    statements.push(db.prepare('INSERT INTO products (id, name, stock_kg, cost_price_vnd, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').bind(p.id, p.name, p.stock, p.costPrice, now, now));
+  }
+  for (const t of state.transactions) {
+    statements.push(db.prepare('INSERT INTO transactions (id, date, type, product_id, qty_kg, price_vnd, total_vnd, cost_vnd, order_id, order_name, retail, rx, grams, thang, unit_price_vnd, ts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(t.id, t.date, t.type, t.productId, t.qty, t.price, t.total, t.cost, t.orderId, t.orderName, t.retail ? 1 : 0, t.rx ? 1 : 0, t.grams, t.thang, t.unitPrice, t.ts, now));
+  }
+  for (const r of state.prescriptions) {
+    statements.push(db.prepare('INSERT INTO prescriptions (id, name, total_vnd, thang, updated_at) VALUES (?, ?, ?, ?, ?)').bind(r.id, r.name, r.total, r.thang, r.updatedAt || now));
+    for (const item of r.items) {
+      statements.push(db.prepare('INSERT INTO prescription_items (prescription_id, product_id, grams) VALUES (?, ?, ?)').bind(r.id, item.productId, item.grams));
+    }
+  }
+  for (const l of state.ledger) {
+    statements.push(db.prepare('INSERT INTO ledger (id, date, type, amount_vnd, category, ts) VALUES (?, ?, ?, ?, ?, ?)').bind(l.id, l.date, l.type, l.amount, l.category, l.ts || now));
+  }
+  await db.batch(statements);
+  return now;
+}
+
 function jsonRes(obj, status){
   return new Response(JSON.stringify(obj), {
     status: status || 200,
@@ -4077,7 +4191,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const method = request.method;
-    const kv = env && env.KV;
+    const d1 = env && env.DB;
 
     // Không cho website khác gọi API (không còn CORS).
     if (method === 'OPTIONS') return new Response(null, { status: 204 });
@@ -4092,39 +4206,37 @@ export default {
       });
     }
 
-    // ---------- Đồng bộ dữ liệu ----------
-    if (url.pathname === '/sync') {
+    // ---------- Đồng bộ dữ liệu D1 ----------
+    if (url.pathname === '/api/state') {
       try {
+        if (!d1) return jsonRes({ success: false, error: 'D1 chưa được cấu hình' }, 503);
         if (method === 'GET') {
-          const raw = kv ? await kv.get(KV_KEY) : null;
-          const data = raw ? JSON.parse(raw) : null;
+          const data = await readState(d1);
           return jsonRes({ success: true, data });
         }
-        if (method === 'POST') {
+        if (method === 'PUT') {
           const len = Number(request.headers.get('content-length') || 0);
           if (len > MAX_BODY) return jsonRes({ success: false, error: 'Payload too large' }, 413);
           const text = await request.text();
           if (text.length > MAX_BODY) return jsonRes({ success: false, error: 'Payload too large' }, 413);
           const body = JSON.parse(text);
-          if (!kv) throw new Error('KV chưa được cấu hình');
           const baseHdr = request.headers.get('X-Base-Updated');
           if (baseHdr !== null && request.headers.get('X-Force') !== '1') {
             const baseNum = Number(baseHdr);
-            if (isFinite(baseNum)) {
-              const curRaw = await kv.get(KV_KEY);
-              let cur = null;
-              if (curRaw) { try { cur = JSON.parse(curRaw); } catch (e) { cur = null; } }
-              if (cur && Number(cur.updatedAt) > baseNum) {
-                return jsonRes({ success: false, conflict: true, updatedAt: Number(cur.updatedAt) }, 409);
+            if (Number.isFinite(baseNum)) {
+              const current = await getSourceUpdatedAt(d1);
+              if (current > baseNum) {
+                return jsonRes({ success: false, conflict: true, updatedAt: current }, 409);
               }
             }
           }
-          await kv.put(KV_KEY, JSON.stringify(body));
-          return jsonRes({ success: true });
+          const updatedAt = await writeState(d1, body);
+          return jsonRes({ success: true, updatedAt });
         }
-        return new Response('Method Not Allowed', { status: 405 });
+        return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, PUT' } });
       } catch (err) {
-        return jsonRes({ success: false, error: err.message }, 500);
+        console.error('/api/state', err);
+        return jsonRes({ success: false, error: 'Không đọc/ghi được dữ liệu' }, 500);
       }
     }
 
@@ -4133,19 +4245,26 @@ export default {
     }
 
     // ---------- Trang chính ----------
+    if (!d1) {
+      return new Response('D1 chưa được cấu hình', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+      });
+    }
+
     let data = null;
-    let kvFailed = false;
     try {
-      const raw = kv ? await kv.get(KV_KEY) : null;
-      data = raw ? JSON.parse(raw) : null;
+      data = await readState(d1);
     } catch (e) {
-      data = null;
-      kvFailed = true;
+      console.error('readState', e);
+      return new Response('Không đọc được dữ liệu. Vui lòng thử lại sau.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+      });
     }
 
     const n = nonce();
     const boot = bootJson(data);
-    if (kvFailed) boot.needFetch = true;
     const html = PAGE
       .split('%%NONCE%%').join(n)
       .split('%%BOOT%%').join(boot.json)

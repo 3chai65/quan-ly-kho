@@ -2,6 +2,11 @@ name = "quan-ly-kho"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "quan-ly-kho"
+database_id = "db9f5180-0f90-4f0e-bba9-2141f1c52fe6"
+
 [[kv_namespaces]]
 binding = "KV"
 id = "59645293dd5b48348edf19a901ce19d3"
