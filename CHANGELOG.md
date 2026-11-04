@@ -5,6 +5,23 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.5.0] - 2026-11-04
+
+### Thêm mới
+
+- **Sổ Thu Chi** (mục *4. Sổ Thu Chi*, ngay sau *3. Nhập hàng*): ghi nhanh thu/chi bằng
+  loạt nút `[Thu] [Chi]` → nhập số tiền → chọn danh mục → **Ghi**. Bảng lịch sử tháng
+  hiện tại (đi theo bộ màu xanh/đỏ) với **tổng kết Thu tháng / Chi tháng / Số dư**; mỗi
+  dòng có menu `···` để xóa. Dữ liệu lưu vào `db.ledger` nên **tự động đồng bộ Cloud**,
+  có trong bản sao lưu khôi phục cả khi đặt lại. Danh mục Thu: Bán hàng, Bán lẻ, Thu nợ,
+  Khác · Danh mục Chi: Nhập hàng, Tiền nhà, Lương, Điện nước, Vận chuyển, Khác.
+
+### Thay đổi
+
+- **"Gần nhất" trong Lịch sử nhập & bán hàng giờ hiện cả ngày** thay vì chỉ các giao
+  dịch trong cùng phút gần nhất (trước đây bán xong là các đơn cũ bị ẩn, dễ hiểu lầm là
+  mất đơn). Bấm **Tất cả** hoặc lọc theo tháng vẫn xem được toàn bộ.
+
 ## [1.4.8] - 2026-11-04
 
 ### Thay đổi
