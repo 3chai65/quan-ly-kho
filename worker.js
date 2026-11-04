@@ -435,7 +435,7 @@ table.inv .c-del,table.his .c-act{width:auto}
     <div class="stat">
       <div>
         <p class="stat__k">Tổng tồn kho</p>
-        <p class="stat__v" id="statStock">0 kg</p>
+        <p class="stat__v" id="statStock">0g</p>
       </div>
       <span class="stat__ic ic-purple" aria-hidden="true"><svg class="ico"><use href="#i-warehouse"/></svg></span>
     </div>
@@ -474,7 +474,7 @@ table.inv .c-del,table.his .c-act{width:auto}
               <th class="c-num" scope="col">STT</th>
               <th scope="col">Tên</th>
               <th class="c-qty" scope="col">SL (kg)</th>
-              <th class="c-money" scope="col">Thành tiền (k)</th>
+              <th class="c-money" scope="col">Thành tiền</th>
               <th class="c-del" scope="col"><span class="sr">Xóa</span></th>
             </tr></thead>
             <tbody id="retailBody"></tbody>
@@ -494,7 +494,7 @@ table.inv .c-del,table.his .c-act{width:auto}
             <tbody id="retailNoteBody"></tbody>
             <tfoot><tr>
               <td colspan="3">Tổng tiền</td>
-              <td class="num txt-green r" id="retailNoteTotal">0 k</td>
+              <td class="num txt-green r" id="retailNoteTotal">0</td>
               <td></td>
             </tr></tfoot>
           </table>
@@ -503,7 +503,7 @@ table.inv .c-del,table.his .c-act{width:auto}
         <div class="foot foot--retail">
           <div class="total">
             <span class="lbl lbl--flat">Thành tiền</span>
-            <span class="total__v txt-green" id="retailTotal">0 k</span>
+            <span class="total__v txt-green" id="retailTotal">0</span>
           </div>
           <button class="btn btn--green" type="button" data-action="save-retail">
             <svg class="ico" aria-hidden="true"><use href="#i-save"/></svg>Lưu đơn
@@ -594,7 +594,7 @@ table.inv .c-del,table.his .c-act{width:auto}
           <span class="b txt-brand" aria-hidden="true">=</span>
           <div class="inline-row">
             <span class="lbl lbl--flat">Thành tiền</span>
-            <span class="b txt-brand num" id="remedyTotal" aria-live="polite">0 k</span>
+            <span class="b txt-brand num" id="remedyTotal" aria-live="polite">0</span>
           </div>
         </div>
         <div class="foot">
@@ -644,7 +644,7 @@ table.inv .c-del,table.his .c-act{width:auto}
       <p class="hint mt-10" id="nhapHint" hidden></p>
       <div class="hintbox mt-12">
         <span class="lbl lbl--flat">Thành tiền</span>
-        <span class="b txt-blue num" id="nhapTotal">0 k</span>
+        <span class="b txt-blue num" id="nhapTotal">0</span>
       </div>
       <p class="hint mt-10">Nhập số lượng, giá rồi nhấn Enter để thêm vào tờ ghi. Nhấn Enter xong sẽ quay về ô tên vị thuốc.</p>
       <div class="note mt-12" id="nhapListBox" hidden>
@@ -661,7 +661,7 @@ table.inv .c-del,table.his .c-act{width:auto}
           <tbody id="nhapListBody"></tbody>
           <tfoot><tr>
             <td colspan="3">Tổng tiền</td>
-            <td class="num txt-blue r" id="nhapListTotal">0 k</td>
+            <td class="num txt-blue r" id="nhapListTotal">0</td>
             <td></td>
           </tr></tfoot>
         </table>
@@ -959,7 +959,7 @@ table.inv .c-del,table.his .c-act{width:auto}
       </div>
       <div class="hintbox mt-12">
         <span class="lbl lbl--flat">Thành tiền</span>
-        <span class="b txt-brand num" id="txEditTotal">0 k</span>
+        <span class="b txt-brand num" id="txEditTotal">0</span>
       </div>
     </div>
     <div class="card__foot dlg__foot">
@@ -993,7 +993,7 @@ table.inv .c-del,table.his .c-act{width:auto}
             <td colspan="2" id="orderFootLabel">Tổng cộng</td>
             <td class="num txt-green" id="orderFootQty">0</td>
             <td class="num txt-green r" id="orderFootPrice" hidden></td>
-            <td class="num txt-green r" id="orderFootMoney" hidden>0 k</td>
+            <td class="num txt-green r" id="orderFootMoney" hidden>0</td>
           </tr></tfoot>
         </table>
         <div class="foot" id="orderPager" hidden></div>
@@ -1011,7 +1011,7 @@ table.inv .c-del,table.his .c-act{width:auto}
         <span class="b txt-brand" aria-hidden="true">=</span>
         <div class="inline-row">
           <span class="lbl lbl--flat">Thành tiền</span>
-          <span class="b txt-brand num" id="orderTotal">0 k</span>
+          <span class="b txt-brand num" id="orderTotal">0</span>
         </div>
       </div>
     </div>
@@ -1082,11 +1082,11 @@ function fmtNum(n){
   var fp = parts[1] ? ',' + parts[1] : '';
   return (neg ? '-' : '') + ip + fp;
 }
-/* Quy ước hiển thị: 1 kg = 10 lạng = 1000 g  ·  1 tr = 1000 k */
+/* Quy ước hiển thị: 1 kg = 10 lạng = 1000 g  ·  1 tr = 1000 */
 function fmtQty(kg){
   var n = dec(kg);
   var a = Math.abs(n);
-  if (a === 0) return '0 kg';
+  if (a === 0) return '0g';
   if (a >= 1) return fmtNum(n) + ' kg';
   var lang = dec(n * 10);
   if (Math.abs(lang) >= 1) return fmtNum(lang) + ' lạng';
@@ -1543,10 +1543,10 @@ function addOrderRow(kind, pid){
 
   if (isRetail) {
     var tdM = el('td', 'c-money');
-    tdM.setAttribute('data-label', 'Thành tiền (k)');
+    tdM.setAttribute('data-label', 'Thành tiền');
     var mi = el('input', 'inp inp--sm inp--num retail-money');
     mi.type = 'number'; mi.step = 'any'; mi.min = '0'; mi.inputMode = 'decimal'; mi.placeholder = '0';
-    mi.setAttribute('aria-label', 'Thành tiền (k)');
+    mi.setAttribute('aria-label', 'Thành tiền');
     tdM.appendChild(mi);
     tr.appendChild(tdM);
   }
@@ -1650,7 +1650,7 @@ function renderNote(){
       var mi = el('input', 'inp inp--sm inp--num');
       mi.id = 'noteEditMoney'; mi.type = 'number'; mi.step = 'any'; mi.min = '0'; mi.inputMode = 'decimal';
       mi.value = String(num(it.amount));
-      mi.setAttribute('aria-label', 'Thành tiền (k)');
+      mi.setAttribute('aria-label', 'Thành tiền');
       tdm.appendChild(mi);
       var bs = el('button', 'btn btn--icon');
       bs.type = 'button'; bs.setAttribute('data-action', 'note-save'); bs.setAttribute('aria-label', 'Lưu dòng');
