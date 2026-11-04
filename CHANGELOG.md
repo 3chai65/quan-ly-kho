@@ -5,6 +5,17 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.6.0] - 2026-11-04
+
+### Thay đổi phá vỡ
+
+- **Bỏ hoàn toàn đăng nhập của ứng dụng**: mọi người có link đều xem và thao tác được app,
+  không còn mật khẩu `APP_PASSWORD`, cookie `qlk_session`, trang `/login`, nút **Thoát**
+  và cơ chế khóa tạm theo IP.
+- **`/sync` không còn yêu cầu xác thực**: dữ liệu có thể bị xem, ghi đè hoặc thay đổi bởi
+  bất kỳ ai có link. Mọi người dùng nên chủ động backup JSON thường xuyên.
+- Không nên dùng bản này để lưu dữ liệu cần riêng tư.
+
 ## [1.5.1] - 2026-11-04
 
 ### Thêm mới
