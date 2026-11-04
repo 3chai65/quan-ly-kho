@@ -5,6 +5,12 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.4.3] - 2026-11-04
+
+### Thay đổi
+
+- **Nhãn tiền**: bỏ `(k)` trong tiêu đề cột và tổng tiền, đồng bộ hiển thị.
+
 ## [1.4.2] - 2026-11-04
 
 ### Thay đổi
