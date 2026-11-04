@@ -5,6 +5,13 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.4.1] - 2026-11-04
+
+### Thay đổi
+
+- **Đơn vị tiền**: bỏ đơn vị `tr` (triệu) và `k` (nghìn); hiển thị tiền đầy đủ bằng VND,
+  làm tròn đến hàng nghìn, phân cách nghìn bằng dấu `.` (ví dụ `69.457.000`).
+
 ## [1.4.0] - 2026-11-04
 
 Bản cập nhật đồng bộ cách hiển thị lịch sử nhập hàng với lịch sử bán hàng, chuẩn hoá
