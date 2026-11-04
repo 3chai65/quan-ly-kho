@@ -1094,8 +1094,7 @@ function fmtQty(kg){
 }
 function fmtMoney(k){
   var n = dec(k);
-  var vndThousands = Math.trunc(n);
-  return fmtNum(vndThousands * 1000);
+  return fmtNum(Math.trunc(n));
 }
 function fmtUnitPrice(k){ return fmtMoney(k) + '/kg'; }
 function fmtInt(n){ return fmtNum(n); }
