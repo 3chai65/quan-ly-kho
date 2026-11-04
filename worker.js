@@ -581,7 +581,9 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
             <tfoot><tr>
               <td colspan="2">Tổng 1 thang</td>
               <td class="num txt-brand" id="remedyNoteTotal">0 g</td>
-              <td></td>
+              <td>
+                <div class="inline-row"><input class="inp inp--sm inp--num w-120" id="remedyUnitPrice" type="number" step="any" min="0" inputmode="decimal" placeholder="0" aria-label="Giá 1 thang" title="Giá 1 thang"></div>
+              </td>
             </tr></tfoot>
           </table>
           <div class="foot" id="remedyNotePager" hidden></div>
@@ -590,12 +592,6 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
           <div class="inline-row">
             <label class="lbl lbl--flat" for="remedyThang">Số thang</label>
             <input class="inp inp--sm inp--num w-70" id="remedyThang" type="number" step="1" min="1" inputmode="numeric" value="1" aria-label="Số thang">
-          </div>
-          <span class="b txt-brand" aria-hidden="true">×</span>
-          <div class="inline-row">
-            <label class="lbl lbl--flat" for="remedyUnitPrice">Giá 1 thang</label>
-            <input class="inp inp--sm inp--num w-120" id="remedyUnitPrice" type="number" step="any" min="0" inputmode="decimal" placeholder="0" aria-label="Giá 1 thang (k)">
-            <span class="b txt-brand">k</span>
           </div>
           <span class="b txt-brand" aria-hidden="true">=</span>
           <div class="inline-row">

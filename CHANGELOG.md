@@ -5,6 +5,17 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.4.7] - 2026-11-04
+
+### Thay đổi
+
+- **Giá 1 thang nằm ngay trong tờ ghi đơn thuốc chén**: ô nhập *Giá 1 thang* được dời
+  vào cuối dòng *Tổng 1 thang* (bên phải số gram, dạng số trơn không có chữ `k`), ví dụ
+  `Tổng 1 thang · 415 g · [140]`.
+- **Khung tính tiền gọn lại**: phía dưới chỉ còn `Số thang [10] = Thành tiền 1.400`;
+  bỏ cụm `× Giá 1 thang` vì giá đã nhập ngay trên tờ ghi. Thành tiền vẫn là
+  *Số thang × Giá 1 thang* và cập nhật ngay khi thay đổi.
+
 ## [1.4.6] - 2026-11-04
 
 ### Thay đổi
