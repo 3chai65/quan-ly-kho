@@ -5,6 +5,18 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.4.4] - 2026-11-04
+
+### Sửa lỗi
+
+- **Căn cột tiền trong tờ ghi**: ô *Đơn giá* và *Thành tiền* của từng dòng trong hộp chi
+  tiết đơn nhập và trong *Tờ ghi nhập hàng* (danh sách chờ nhập) giờ căn phải, thẳng cột
+  với tiêu đề và dòng *Tổng cộng / Tổng tiền* ở cuối bảng (trước đây các ô này căn trái
+  nên tiền bị lệch cột so với tiêu đề và số tổng).
+- **Lịch sử nhập & bán hàng**: cột *Đơn giá* và *Thành tiền* (cả tiêu đề lẫn số liệu)
+  căn phải trên màn hình rộng để các cột tiền thẳng hàng; trên điện thoại giữ nguyên
+  dạng thẻ như cũ.
+
 ## [1.4.3] - 2026-11-04
 
 ### Thay đổi

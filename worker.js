@@ -322,6 +322,10 @@ table.inv .c-del,table.his .c-act{width:auto}
 .note td,.note th{padding-left:5px;padding-right:5px}
 .note .c-act .btn--icon{min-width:32px;width:32px;min-height:32px;height:32px}
 }
+@media (min-width:601px){
+table.his th:nth-child(4),table.his th:nth-child(5),
+table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
+}
 @media (prefers-reduced-motion:reduce){
 *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
@@ -2301,8 +2305,8 @@ function renderOrder(){
       tr.appendChild(el('td', 'num', fmtGram(g)));
     } else {
       tr.appendChild(el('td', 'num', fmtQty(t.qty)));
-      if (isImp) tr.appendChild(el('td', 'num', fmtUnitPrice(t.price)));
-      tr.appendChild(el('td', 'num b ' + (isImp ? 'txt-blue' : 'txt-green'), fmtMoney(t.total)));
+      if (isImp) tr.appendChild(el('td', 'num r', fmtUnitPrice(t.price)));
+      tr.appendChild(el('td', 'num r b ' + (isImp ? 'txt-blue' : 'txt-green'), fmtMoney(t.total)));
     }
     tb.appendChild(tr);
   });
@@ -3056,7 +3060,7 @@ function renderNhapList(){
     var cq = el('td', 'num', fmtQty(it.qty));
     cq.setAttribute('data-label', 'SL');
     tr.appendChild(cq);
-    var cp = el('td', 'num muted', it.price > 0 ? fmtMoney(it.price) : '—');
+    var cp = el('td', 'num muted r', it.price > 0 ? fmtMoney(it.price) : '—');
     cp.setAttribute('data-label', 'Giá nhập');
     tr.appendChild(cp);
     var td = el('td', 'c-act');
