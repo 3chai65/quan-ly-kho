@@ -5,6 +5,17 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.4.5] - 2026-11-04
+
+### Sửa lỗi
+
+- **Xóa đơn nhập gộp**: nút thùng rác ở dòng *Đơn nhập ngày …* trong *Lịch sử nhập hàng*
+  trước đây **cộng thêm** số lượng vào tồn kho của từng vị thuốc (đúng với đơn bán), làm
+  tồn kho tăng ảo sau khi xóa. Nay xóa đơn nhập sẽ **trừ** lại số lượng đã nhập, xóa đơn
+  bán vẫn cộng lại tồn như cũ (giống xóa từng dòng giao dịch lẻ).
+- Logic giá giữ nguyên theo đúng sổ sách: mỗi giao dịch lưu đơn giá tại thời điểm
+  nhập/bán; giá vốn đơn bán tính theo giá vốn lúc bán ra.
+
 ## [1.4.4] - 2026-11-04
 
 ### Sửa lỗi

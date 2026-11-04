@@ -3231,7 +3231,10 @@ function delOrder(oid){
   if (!confirm('Xóa cả ' + label + '? Tồn kho sẽ được điều chỉnh lại.')) return;
   items.forEach(function(t){
     var p = findProduct(t.productId);
-    if (p) p.stock = dec(p.stock + num(t.qty));
+    if (!p) return;
+    /* Nhập: xóa đơn phải trừ tồn lại; Bán: cộng tồn lại */
+    if (t.type === 'NHAP') p.stock = dec(p.stock - num(t.qty));
+    else p.stock = dec(p.stock + num(t.qty));
   });
   db.transactions = db.transactions.filter(function(x){ return x.oid !== oid; });
   commit('Đã xóa đơn');
