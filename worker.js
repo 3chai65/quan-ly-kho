@@ -106,6 +106,13 @@ border:1px solid var(--border);border-radius:12px;box-shadow:0 14px 34px rgba(15
 color:var(--text);border-radius:8px;font:inherit;font-size:14px;cursor:pointer;text-align:left}
 .menu__item:hover{background:var(--surface2)}
 .menu__item[aria-checked=true]{background:var(--brand-soft);color:var(--brand-text);font-weight:700}
+/* ---------- row action menu (···) ---------- */
+.rowmenu{position:static;display:inline-flex}
+.rowmenu__list{position:fixed;z-index:120;min-width:180px;background:var(--surface);
+border:1px solid var(--border);border-radius:12px;box-shadow:0 14px 34px rgba(15,23,42,.18);padding:6px}
+.rowmenu__list[hidden]{display:none}
+.menu__item--danger{color:var(--red-text)}
+.menu__item--danger:hover{background:var(--red-soft);color:var(--red-text)}
 /* ---------- cards ---------- */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
 .card__head{display:flex;align-items:center;gap:10px;padding:13px 16px;flex-wrap:wrap}
@@ -144,6 +151,10 @@ background:var(--surface);color:var(--text);font:inherit;font-size:14px}
 .inp:focus{outline:none;border-color:var(--brand);box-shadow:var(--ring)}
 .inp--sm{min-height:36px;padding:6px 9px;font-size:13px;border-radius:8px}
 .inp--num{text-align:right;font-variant-numeric:tabular-nums}
+/* Ẩn mũi tên spin của mọi input number (desktop) — mobile vẫn nhập số qua bàn phím */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
 select.inp{cursor:pointer}
 .datefield,.monthfield{position:relative}
 .datefield .inp{padding-right:42px}
@@ -367,6 +378,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
 <symbol id="i-warn" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
 <symbol id="i-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
 <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
 <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
@@ -1497,15 +1509,10 @@ function renderRemedyNote(){
       wrap.appendChild(bs); wrap.appendChild(bc);
     } else {
       tdq = el('td', 'num', fmtGram(it.grams));
-      var be = el('button', 'btn btn--icon');
-      be.type = 'button'; be.setAttribute('data-action', 'rnote-edit'); be.setAttribute('data-idx', String(i));
-      be.setAttribute('aria-label', 'Sửa dòng ' + (i + 1));
-      be.appendChild(svg('edit'));
-      var bd = el('button', 'btn btn--icon btn--danger');
-      bd.type = 'button'; bd.setAttribute('data-action', 'rnote-del'); bd.setAttribute('data-idx', String(i));
-      bd.setAttribute('aria-label', 'Xóa dòng ' + (i + 1));
-      bd.appendChild(svg('trash'));
-      wrap.appendChild(be); wrap.appendChild(bd);
+      wrap.appendChild(rowMenu([
+        { label: 'Sửa dòng', icon: 'edit', action: 'rnote-edit', idx: i },
+        { label: 'Xóa dòng', icon: 'trash', action: 'rnote-del', idx: i, danger: true }
+      ], 'Thao tác với dòng ' + (i + 1)));
     }
     tr.appendChild(tdq);
     tda.appendChild(wrap);
@@ -1664,15 +1671,10 @@ function renderNote(){
     } else {
       tdq = el('td', 'num', fmtQty(it.kg));
       tdm = el('td', 'num r', fmtMoney(it.amount));
-      var be = el('button', 'btn btn--icon');
-      be.type = 'button'; be.setAttribute('data-action', 'note-edit'); be.setAttribute('data-idx', String(i));
-      be.setAttribute('aria-label', 'Sửa dòng ' + (i + 1));
-      be.appendChild(svg('edit'));
-      var bd = el('button', 'btn btn--icon btn--danger');
-      bd.type = 'button'; bd.setAttribute('data-action', 'note-del'); bd.setAttribute('data-idx', String(i));
-      bd.setAttribute('aria-label', 'Xóa dòng ' + (i + 1));
-      bd.appendChild(svg('trash'));
-      wrap.appendChild(be); wrap.appendChild(bd);
+      wrap.appendChild(rowMenu([
+        { label: 'Sửa dòng', icon: 'edit', action: 'note-edit', idx: i },
+        { label: 'Xóa dòng', icon: 'trash', action: 'note-del', idx: i, danger: true }
+      ], 'Thao tác với dòng ' + (i + 1)));
     }
     tr.appendChild(tdq);
     tr.appendChild(tdm);
@@ -2095,6 +2097,71 @@ function renderPager(host, page, total, kind){
   nav.appendChild(mkPageBtn('Sau', page + 1, page >= total, kind));
   host.appendChild(nav);
 }
+/* ================= MENU THAO TÁC (···) ================= */
+/* Menu thao tác nhỏ gắn vào từng dòng (sửa/xóa). Position cố định để không bị
+   cắt bởi vùng cuộn ngang của bảng; tự đóng khi bấm ra ngoài/Esc/cuộn trang. */
+var rowMenuCur = null;
+function closeRowMenu(refocus){
+  if (!rowMenuCur) return;
+  rowMenuCur.list.hidden = true;
+  rowMenuCur.btn.setAttribute('aria-expanded', 'false');
+  var b = rowMenuCur.btn;
+  rowMenuCur = null;
+  if (refocus) { try { b.focus({ preventScroll: true }); } catch (e) { b.focus(); } }
+}
+function toggleRowMenu(btn, list){
+  if (rowMenuCur && rowMenuCur.btn === btn) { closeRowMenu(); return; }
+  closeRowMenu();
+  list.hidden = false;
+  var r = btn.getBoundingClientRect();
+  var w = list.offsetWidth, h = list.offsetHeight;
+  var left = r.right - w;
+  if (left < 8) left = 8;
+  if (left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
+  var top = r.bottom + 6;
+  if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  list.style.left = left + 'px';
+  list.style.top = top + 'px';
+  btn.setAttribute('aria-expanded', 'true');
+  rowMenuCur = { btn: btn, list: list };
+}
+function rowMenu(items, label){
+  var wrap = el('div', 'rowmenu');
+  var b = el('button', 'btn btn--icon');
+  b.type = 'button';
+  b.setAttribute('aria-haspopup', 'menu');
+  b.setAttribute('aria-expanded', 'false');
+  b.setAttribute('aria-label', label || 'Thao tác');
+  b.appendChild(svg('dots'));
+  var list = el('div', 'rowmenu__list');
+  list.setAttribute('role', 'menu');
+  list.hidden = true;
+  items.forEach(function(it){
+    var ib = el('button', 'menu__item' + (it.danger ? ' menu__item--danger' : ''));
+    ib.type = 'button';
+    ib.setAttribute('role', 'menuitem');
+    ib.setAttribute('data-action', it.action);
+    if (it.id != null) ib.setAttribute('data-id', it.id);
+    if (it.idx != null) ib.setAttribute('data-idx', String(it.idx));
+    ib.appendChild(svg(it.icon));
+    ib.appendChild(doc.createTextNode(it.label));
+    ib.addEventListener('click', closeRowMenu);
+    list.appendChild(ib);
+  });
+  b.addEventListener('click', function(e){ e.stopPropagation(); toggleRowMenu(b, list); });
+  wrap.appendChild(b);
+  wrap.appendChild(list);
+  return wrap;
+}
+doc.addEventListener('click', function(e){
+  if (!rowMenuCur) return;
+  var t = e.target;
+  if (t && t.closest && (t.closest('.rowmenu__list') || t.closest('.rowmenu'))) return;
+  closeRowMenu();
+}, true);
+doc.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeRowMenu(true); });
+doc.addEventListener('scroll', closeRowMenu, true);
+window.addEventListener('resize', closeRowMenu);
 function emptyRow(tbody, cols, text){
   var tr = el('tr');
   tr.className = 'is-empty';
@@ -2149,21 +2216,10 @@ function renderInventory(){
     tr.appendChild(cVal);
 
     var tdA = el('td', 'c-del');
-    var box = el('div', 'inline-row');
-    var be = el('button', 'btn btn--icon');
-    be.type = 'button'; be.title = 'Sửa tên và giá nhập';
-    be.setAttribute('data-action', 'edit-prod');
-    be.setAttribute('data-id', p.id);
-    be.setAttribute('aria-label', 'Sửa ' + p.name);
-    be.appendChild(svg('edit', 'txt-brand'));
-    var bd = el('button', 'btn btn--icon btn--danger');
-    bd.type = 'button'; bd.title = 'Xóa vị thuốc';
-    bd.setAttribute('data-action', 'del-prod');
-    bd.setAttribute('data-id', p.id);
-    bd.setAttribute('aria-label', 'Xóa ' + p.name);
-    bd.appendChild(svg('trash'));
-    box.appendChild(be); box.appendChild(bd);
-    tdA.appendChild(box);
+    tdA.appendChild(rowMenu([
+      { label: 'Sửa vị thuốc', icon: 'edit', action: 'edit-prod', id: p.id },
+      { label: 'Xóa vị thuốc', icon: 'trash', action: 'del-prod', id: p.id, danger: true }
+    ], 'Thao tác với ' + p.name));
     tr.appendChild(tdA);
     tbody.appendChild(tr);
   });
@@ -2203,15 +2259,9 @@ function appendOrderRow(tbody, r, isImp){
   cTotal.setAttribute('data-label', 'Thành tiền');
   tr.appendChild(cTotal);
   var td = el('td', 'c-act');
-  var wrap = el('div', 'inline-row');
-  var bd = el('button', 'btn btn--icon btn--danger');
-  bd.type = 'button';
-  bd.setAttribute('data-action', 'del-order');
-  bd.setAttribute('data-id', r.oid);
-  bd.setAttribute('aria-label', 'Xóa ' + r.oname + ' ngày ' + dateVN(r.date));
-  bd.appendChild(svg('trash'));
-  wrap.appendChild(bd);
-  td.appendChild(wrap);
+  td.appendChild(rowMenu([
+    { label: 'Xóa đơn', icon: 'trash', action: 'del-order', id: r.oid, danger: true }
+  ], 'Thao tác với ' + r.oname));
   tr.appendChild(td);
   tbody.appendChild(tr);
 }
@@ -2476,22 +2526,10 @@ function renderHistory(kind){
     cTotal.setAttribute('data-label', 'Thành tiền');
     tr.appendChild(cTotal);
     var td = el('td', 'c-act');
-    var wrap = el('div', 'inline-row');
-    var be = el('button', 'btn btn--icon');
-    be.type = 'button';
-    be.setAttribute('data-action', 'tx-edit');
-    be.setAttribute('data-id', t.id);
-    be.setAttribute('aria-label', 'Sửa giao dịch ngày ' + dateVN(t.date));
-    be.appendChild(svg('edit'));
-    var bd = el('button', 'btn btn--icon btn--danger');
-    bd.type = 'button';
-    bd.setAttribute('data-action', 'del-tx');
-    bd.setAttribute('data-id', t.id);
-    bd.setAttribute('aria-label', 'Xóa giao dịch ngày ' + dateVN(t.date));
-    bd.appendChild(svg('trash'));
-    wrap.appendChild(be);
-    wrap.appendChild(bd);
-    td.appendChild(wrap);
+    td.appendChild(rowMenu([
+      { label: 'Sửa giao dịch', icon: 'edit', action: 'tx-edit', id: t.id },
+      { label: 'Xóa giao dịch', icon: 'trash', action: 'del-tx', id: t.id, danger: true }
+    ], 'Thao tác với giao dịch ngày ' + dateVN(t.date)));
     tr.appendChild(td);
     tbody.appendChild(tr);
   });
@@ -3062,13 +3100,9 @@ function renderNhapList(){
     cp.setAttribute('data-label', 'Giá nhập');
     tr.appendChild(cp);
     var td = el('td', 'c-act');
-    var b = el('button', 'btn btn--icon btn--danger');
-    b.type = 'button';
-    b.setAttribute('data-action', 'del-nhap-item');
-    b.setAttribute('data-idx', String(i));
-    b.setAttribute('aria-label', 'Xóa ' + it.name + ' khỏi tờ ghi nhập hàng');
-    b.appendChild(svg('trash'));
-    td.appendChild(b);
+    td.appendChild(rowMenu([
+      { label: 'Xóa dòng', icon: 'trash', action: 'del-nhap-item', idx: i, danger: true }
+    ], 'Thao tác với ' + it.name));
     tr.appendChild(td);
     tb.appendChild(tr);
   });

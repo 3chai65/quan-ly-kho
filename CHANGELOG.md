@@ -5,6 +5,21 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.4.8] - 2026-11-04
+
+### Thay đổi
+
+- **Cột thao tác (sửa/xóa) chuyển thành menu `···`** trong toàn bộ các bảng có nút
+  thao tác theo dòng: *Tồn kho*, *Lịch sử nhập hàng & bán hàng* (giao dịch lẻ và đơn
+  gộp), *Tờ ghi nhập hàng* (danh sách chờ nhập), *Tờ ghi bán lẻ* và *Tờ ghi đơn thuốc
+  chén*. Menu dùng `position: fixed` nên không bị cắt bởi vùng cuộn ngang của bảng,
+  tự căn theo nút `···` (căn phải, tự lật lên trên khi gần đáy màn hình); đóng khi
+  bấm ra ngoài, nhấn **Esc**, cuộn trang hoặc đổi kích thước cửa sổ. Mỗi mục xóa tô
+  màu đỏ; điều hướng bàn phím và ARIA (`aria-haspopup="menu"`, `role=menu/menuitem`).
+  Hành vi sửa/xóa giữ nguyên.
+- **Ẩn dấu mũi tên (spinner) của mọi ô nhập `type="number"`** trên desktop
+  (Chrome/Edge/Firefox); trên mobile vẫn nhập số qua bàn phím như cũ.
+
 ## [1.4.7] - 2026-11-04
 
 ### Thay đổi
