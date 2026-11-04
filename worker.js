@@ -412,23 +412,23 @@ table.inv .c-del,table.his .c-act{width:auto}
     <div class="stat">
       <div>
         <p class="stat__k">Nhập trong tháng</p>
-        <p class="stat__v" id="statImport">0 tr</p>
+        <p class="stat__v" id="statImport">0</p>
       </div>
       <span class="stat__ic ic-blue" aria-hidden="true"><svg class="ico"><use href="#i-cart"/></svg></span>
     </div>
     <div class="stat">
       <div>
         <p class="stat__k">Bán trong tháng</p>
-        <p class="stat__v" id="statExport">0 tr</p>
-        <p class="stat__sub">Hôm nay <b id="statExportDay">0 k</b> · Năm <b id="statExportYear">0 k</b></p>
+        <p class="stat__v" id="statExport">0</p>
+        <p class="stat__sub">Hôm nay <b id="statExportDay">0</b> · Năm <b id="statExportYear">0</b></p>
       </div>
       <span class="stat__ic ic-green" aria-hidden="true"><svg class="ico"><use href="#i-cash"/></svg></span>
     </div>
     <div class="stat">
       <div>
         <p class="stat__k">Lợi nhuận tháng</p>
-        <p class="stat__v" id="statProfit">0 tr</p>
-        <p class="stat__sub">Hôm nay <b id="statProfitDay">0 k</b> · Năm <b id="statProfitYear">0 k</b></p>
+        <p class="stat__v" id="statProfit">0</p>
+        <p class="stat__sub">Hôm nay <b id="statProfitDay">0</b> · Năm <b id="statProfitYear">0</b></p>
       </div>
       <span class="stat__ic ic-amber" aria-hidden="true"><svg class="ico"><use href="#i-chart-line"/></svg></span>
     </div>
@@ -684,8 +684,8 @@ table.inv .c-del,table.his .c-act{width:auto}
       <div class="card__body">
         <div class="row mb-12">
           <div class="legend" aria-hidden="true">
-            <span><i class="dot dot--imp"></i>Nhập (tr)</span>
-            <span><i class="dot dot--exp"></i>Bán (tr)</span>
+            <span><i class="dot dot--imp"></i>Nhập</span>
+            <span><i class="dot dot--exp"></i>Bán</span>
           </div>
           <div class="field">
             <label class="lbl" for="chartYear">Năm</label>
@@ -1094,8 +1094,8 @@ function fmtQty(kg){
 }
 function fmtMoney(k){
   var n = dec(k);
-  if (Math.abs(n) >= 1000) return fmtNum(dec(n / 1000)) + ' tr';
-  return fmtNum(n) + ' k';
+  var vndThousands = Math.trunc(n);
+  return fmtNum(vndThousands * 1000);
 }
 function fmtUnitPrice(k){ return fmtMoney(k) + '/kg'; }
 function fmtInt(n){ return fmtNum(n); }
