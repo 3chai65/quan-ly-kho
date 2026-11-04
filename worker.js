@@ -484,6 +484,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
             <tbody id="retailBody"></tbody>
           </table>
         </div>
+        <p class="hint mt-10">Nhập SL và thành tiền rồi nhấn <b>Enter</b> — vị thuốc sẽ được đưa ngay vào tờ ghi bên dưới.</p>
         <div class="note" id="retailNote">
           <div class="note__head"><span>Tờ ghi đơn bán lẻ</span><span id="retailNotePg"></span></div>
           <table>
@@ -565,6 +566,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
             <tbody id="remedyBody"></tbody>
           </table>
         </div>
+        <p class="hint mt-10">Nhập số gram rồi nhấn <b>Enter</b> — vị thuốc sẽ được đưa ngay vào tờ ghi bên dưới.</p>
         <div class="note" id="remedyNote">
           <div class="note__head"><span>Tờ ghi đơn thuốc chén</span><span id="remedyNotePg"></span></div>
           <table>
@@ -3649,17 +3651,18 @@ function bindEvents(){
     s.focus();
     if (typeof s.select === 'function') s.select();
   }
-  function rowEnter(host, sel){
+  function rowEnter(host, add){
     if (!host) return;
     host.addEventListener('keydown', function(e){
       if (e.key !== 'Enter' || e.defaultPrevented) return;
       if (!e.target || e.target.tagName !== 'INPUT') return;
       e.preventDefault();
-      goSearch(sel);
+      /* Enter khi đang nhập dòng: đưa thẳng vào tờ ghi (giống nhập hàng) */
+      add();
     });
   }
-  rowEnter(body, '#retailSearch');
-  rowEnter(rbody, '#remedySearch');
+  rowEnter(body, addRetailToNote);
+  rowEnter(rbody, addRemedyToNote);
   var rup = $('#remedyUnitPrice');
   if (rup) {
     rup.addEventListener('input', calcRemedy);

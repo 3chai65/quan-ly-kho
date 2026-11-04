@@ -5,6 +5,18 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.4.6] - 2026-11-04
+
+### Thay đổi
+
+- **Nhấn Enter là đưa vị thuốc vào tờ ghi** (mục *1. Đơn bán lẻ* và *2. Đơn thuốc chén*):
+  khi đang nhập dòng (ô *SL (kg)* / *Thành tiền*, hoặc ô *Số gram*), nhấn **Enter** sẽ
+  đưa thẳng vị thuốc vào tờ ghi bên dưới (giống nút `+`), tờ ghi tự cập nhật và focus
+  quay về ô tìm vị thuốc để nhập tiếp. Trước đây Enter chỉ đưa focus về ô chọn vị thuốc,
+  vị thuốc chỉ hiện vào tờ ghi khi bạn chọn vị thuốc tiếp theo. Nếu SL/gram = 0 hoặc
+  trống, app báo và focus lại ô cần nhập, không thêm dòng rác. Thêm dòng hint nhắc nhấn
+  Enter ở cả hai mục.
+
 ## [1.4.5] - 2026-11-04
 
 ### Sửa lỗi
