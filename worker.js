@@ -145,6 +145,15 @@ background:var(--surface);color:var(--text);font:inherit;font-size:14px}
 .inp--sm{min-height:36px;padding:6px 9px;font-size:13px;border-radius:8px}
 .inp--num{text-align:right;font-variant-numeric:tabular-nums}
 select.inp{cursor:pointer}
+.datefield,.monthfield{position:relative}
+.datefield .inp{padding-right:42px}
+.monthfield .inp{padding-right:32px}
+.datefield__ico,.monthfield__ico{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.datefield__ico{width:18px;height:18px}
+.monthfield__ico{width:15px;height:15px;right:9px}
+.datefield__native,.monthfield__native{position:absolute;right:0;top:0;height:100%;opacity:0;border:0;padding:0;cursor:pointer}
+.datefield__native{width:42px}
+.monthfield__native{width:30px}
 .row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
 .nhap-row{display:grid;grid-template-columns:minmax(0,1fr) 110px 128px;gap:10px;align-items:end}
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
@@ -208,7 +217,7 @@ background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r
 .pager__num[aria-current=page]{background:var(--brand);border-color:var(--brand);color:#fff}
 .foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
 margin-top:14px;padding-top:13px;border-top:1px solid var(--border2)}
-.note{margin-top:12px;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;background:var(--amber-soft);
+.note{margin-top:12px;border:1px solid var(--border);border-radius:var(--r-sm);overflow-x:auto;overflow-y:hidden;background:var(--amber-soft);
 border-left:3px solid var(--red)}
 .note__head{display:flex;justify-content:space-between;gap:10px;padding:7px 12px;font-size:11px;font-weight:700;
 letter-spacing:.05em;text-transform:uppercase;color:var(--amber-text);border-bottom:1px solid var(--border)}
@@ -358,6 +367,7 @@ table.inv .c-del,table.his .c-act{width:auto}
 <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
 <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
 <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
 </svg>
 <header class="top">
   <div class="wrap bar">
@@ -448,10 +458,15 @@ table.inv .c-del,table.his .c-act{width:auto}
             <div class="sug__list" id="retailList" role="listbox" aria-label="Gợi ý vị thuốc" hidden></div>
           </div>
           <div class="field">
-            <label class="lbl" for="retailDate">Ngày</label>
-            <input class="inp" id="retailDate" type="date">
+            <label class="lbl" for="retailDate">Ngày bán</label>
+            <div class="datefield">
+              <input class="inp" id="retailDate" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" maxlength="10" title="Ngày ghi nhận đơn, mặc định là hôm nay">
+              <svg class="ico datefield__ico" aria-hidden="true"><use href="#i-calendar"/></svg>
+              <input class="datefield__native" id="retailDateNative" type="date" tabindex="-1" aria-label="Chọn ngày từ lịch">
+            </div>
           </div>
         </div>
+        <p class="hint mt-10">Ô “Ngày bán” dùng để ghi ngày vào lịch sử; mặc định là hôm nay.</p>
         <div class="tw">
           <table class="ord">
             <caption class="sr">Các dòng trong đơn bán lẻ</caption>
@@ -514,10 +529,15 @@ table.inv .c-del,table.his .c-act{width:auto}
             </select>
           </div>
           <div class="field">
-            <label class="lbl" for="remedyDate">Ngày</label>
-            <input class="inp" id="remedyDate" type="date">
+            <label class="lbl" for="remedyDate">Ngày bán</label>
+            <div class="datefield">
+              <input class="inp" id="remedyDate" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" maxlength="10" title="Ngày ghi nhận đơn, mặc định là hôm nay">
+              <svg class="ico datefield__ico" aria-hidden="true"><use href="#i-calendar"/></svg>
+              <input class="datefield__native" id="remedyDateNative" type="date" tabindex="-1" aria-label="Chọn ngày từ lịch">
+            </div>
           </div>
         </div>
+        <p class="hint mt-10">Ô “Ngày bán” dùng để ghi ngày vào lịch sử; mặc định là hôm nay.</p>
         <div class="grid2 gap-12 mb-12">
           <div class="sug">
             <label class="lbl" for="remedySearch">Chọn vị thuốc</label>
@@ -739,44 +759,33 @@ table.inv .c-del,table.his .c-act{width:auto}
       <div class="card__body">
         <div class="row mb-12">
           <div class="field">
-            <label class="lbl" for="impMonth">Lọc theo tháng</label>
-            <input class="inp inp--sm" id="impMonth" type="month">
+            <label class="lbl" for="impMonth">Lọc theo tháng (mm/yyyy)</label>
+            <div class="monthfield">
+              <input class="inp inp--sm" id="impMonth" type="text" inputmode="numeric" autocomplete="off" placeholder="mm/yyyy" maxlength="7" aria-label="Lọc theo tháng (mm/yyyy)">
+              <svg class="ico monthfield__ico" aria-hidden="true"><use href="#i-calendar"/></svg>
+              <input class="monthfield__native" id="impMonthNative" type="month" tabindex="-1" aria-label="Chọn tháng từ lịch">
+            </div>
           </div>
           <div class="inline-row">
             <button class="btn btn--sm" type="button" data-action="latest-imp">Gần nhất</button>
             <button class="btn btn--sm" type="button" data-action="clear-imp">Tất cả</button>
           </div>
         </div>
-        <div class="field mb-12">
-          <label class="lbl" for="impBatch">Chọn lần nhập</label>
-          <select class="inp" id="impBatch"></select>
-        </div>
-        <div class="note" id="impNote">
-          <div class="note__head"><span id="impNoteTitle">Tờ ghi nhập hàng</span><span id="impNotePg"></span></div>
-          <table>
-            <caption class="sr">Tờ ghi nhập hàng</caption>
+        <div class="tw">
+          <table class="his">
+            <caption class="sr">Lịch sử nhập hàng</caption>
             <thead><tr>
-              <th class="c-num" scope="col">STT</th>
-              <th scope="col">Tên</th>
+              <th scope="col">Ngày</th>
+              <th scope="col">Vị thuốc</th>
               <th scope="col">SL</th>
-              <th scope="col" class="r">Giá/kg</th>
-              <th class="c-act" scope="col"><span class="sr">Thao tác</span></th>
+              <th scope="col">Đơn giá</th>
+              <th scope="col">Thành tiền</th>
+              <th scope="col" class="c-act"><span class="sr">Thao tác</span></th>
             </tr></thead>
-            <tbody id="impNoteBody"></tbody>
-            <tfoot><tr>
-              <td colspan="3">Tổng tiền</td>
-              <td class="num txt-blue r" id="impNoteTotal">0 k</td>
-              <td></td>
-            </tr></tfoot>
+            <tbody id="impBody"></tbody>
           </table>
-          <div class="foot" id="impPager" hidden></div>
         </div>
-        <div class="foot">
-          <span class="hint" id="impNoteMeta"></span>
-          <button class="btn btn--sm btn--danger" type="button" data-action="del-imp-batch" id="impDelBatch">
-            <svg class="ico" aria-hidden="true"><use href="#i-trash"/></svg>Xóa cả lần nhập
-          </button>
-        </div>
+        <div class="foot" id="impPager"></div>
       </div>
     </details>
 
@@ -791,8 +800,12 @@ table.inv .c-del,table.his .c-act{width:auto}
       <div class="card__body">
         <div class="row mb-12">
           <div class="field">
-            <label class="lbl" for="expMonth">Lọc theo tháng</label>
-            <input class="inp inp--sm" id="expMonth" type="month">
+            <label class="lbl" for="expMonth">Lọc theo tháng (mm/yyyy)</label>
+            <div class="monthfield">
+              <input class="inp inp--sm" id="expMonth" type="text" inputmode="numeric" autocomplete="off" placeholder="mm/yyyy" maxlength="7" aria-label="Lọc theo tháng (mm/yyyy)">
+              <svg class="ico monthfield__ico" aria-hidden="true"><use href="#i-calendar"/></svg>
+              <input class="monthfield__native" id="expMonthNative" type="month" tabindex="-1" aria-label="Chọn tháng từ lịch">
+            </div>
           </div>
           <div class="inline-row">
             <button class="btn btn--sm" type="button" data-action="latest-exp">Gần nhất</button>
@@ -972,12 +985,14 @@ table.inv .c-del,table.his .c-act{width:auto}
             <th class="c-num" scope="col">STT</th>
             <th scope="col">Tên</th>
             <th scope="col" id="orderQtyHead">SL</th>
+            <th class="r" scope="col" id="orderPriceHead" hidden>Đơn giá</th>
             <th class="r" scope="col" id="orderMoneyHead" hidden>Thành tiền</th>
           </tr></thead>
           <tbody id="orderBody"></tbody>
           <tfoot><tr>
             <td colspan="2" id="orderFootLabel">Tổng cộng</td>
             <td class="num txt-green" id="orderFootQty">0</td>
+            <td class="num txt-green r" id="orderFootPrice" hidden></td>
             <td class="num txt-green r" id="orderFootMoney" hidden>0 k</td>
           </tr></tfoot>
         </table>
@@ -1037,31 +1052,156 @@ var NF0 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 var NF1 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 var NF2 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 function num(v){ var n = parseFloat(v); return isFinite(n) ? n : 0; }
-function r2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }
+/* Giữ tối đa 15 chữ số có nghĩa: chỉ dọn nhiễu nhị phân của JavaScript
+   (ví dụ 0.1 + 0.2 = 0.30000000000000004 → 0.3), không làm tròn số liệu thực. */
+function dec(n){
+  n = Number(n);
+  if (!isFinite(n) || n === 0) return 0;
+  /* Nếu một giá trị ngắn hơn (ít chữ số hơn) nằm trong sai số nhị phân cho phép
+     thì dùng giá trị đó; nhờ vậy 6.31142000000001 → 6.31142 nhưng vẫn giữ
+     nguyên các số thực có nhiều chữ số. */
+  for (var p = 1; p < 15; p++) {
+    var r = Number(n.toPrecision(p));
+    if (Math.abs(n - r) <= Math.abs(n) * 1e-12) return r;
+  }
+  return Number(n.toPrecision(15));
+}
+/* Hiển thị đầy đủ chữ số, không làm tròn. Dùng dấu . phân cách nghìn, , thập phân. */
+function fmtNum(n){
+  var v = dec(n);
+  if (v === 0) return '0';
+  var neg = v < 0;
+  if (neg) v = -v;
+  var s = String(v);
+  if (s.indexOf('e') >= 0) {
+    s = v.toFixed(20).replace(/0+$/, '').replace(/\.$/, '');
+    if (!s) s = '0';
+  }
+  var parts = s.split('.');
+  var ip = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  var fp = parts[1] ? ',' + parts[1] : '';
+  return (neg ? '-' : '') + ip + fp;
+}
 /* Quy ước hiển thị: 1 kg = 10 lạng = 1000 g  ·  1 tr = 1000 k */
 function fmtQty(kg){
-  var n = r2(num(kg));
+  var n = dec(kg);
   var a = Math.abs(n);
   if (a === 0) return '0 kg';
-  if (a >= 1) return NF2.format(n) + ' kg';
-  var lang = r2(n * 10);
-  if (Math.abs(lang) >= 10) return NF2.format(n) + ' kg';
-  if (Math.abs(lang) >= 1) return NF1.format(lang) + ' lạng';
-  var g = Math.round(n * 1000);
-  if (Math.abs(g) >= 100) return NF1.format(lang) + ' lạng';
-  return NF0.format(g) + ' g';
+  if (a >= 1) return fmtNum(n) + ' kg';
+  var lang = dec(n * 10);
+  if (Math.abs(lang) >= 1) return fmtNum(lang) + ' lạng';
+  return fmtNum(dec(n * 1000)) + ' g';
 }
 function fmtMoney(k){
-  var n = r2(num(k));
-  if (Math.abs(n) >= 1000) return NF2.format(r2(n / 1000)) + ' tr';
-  return NF1.format(n) + ' k';
+  var n = dec(k);
+  if (Math.abs(n) >= 1000) return fmtNum(dec(n / 1000)) + ' tr';
+  return fmtNum(n) + ' k';
 }
 function fmtUnitPrice(k){ return fmtMoney(k) + '/kg'; }
-function fmtInt(n){ return NF0.format(r2(num(n))); }
+function fmtInt(n){ return fmtNum(n); }
 function pad2(n){ return n < 10 ? '0' + n : '' + n; }
 function todayISO(){ var d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
 function thisMonth(){ return todayISO().slice(0, 7); }
 function thisYear(){ return todayISO().slice(0, 4); }
+function parseDateVN(s){
+  s = String(s || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    var p = s.split('-');
+    var dt0 = new Date(+p[0], +p[1] - 1, +p[2]);
+    return (dt0.getFullYear() === +p[0] && dt0.getMonth() === +p[1] - 1 && dt0.getDate() === +p[2]) ? s : '';
+  }
+  var m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (!m) return '';
+  var d = +m[1], mo = +m[2], y = +m[3];
+  if (y < 100) y += 2000;
+  if (y < 1900 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  var dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return '';
+  return y + '-' + pad2(mo) + '-' + pad2(d);
+}
+function dateInputVN(iso){
+  var p = String(iso || '').split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : '';
+}
+function getDateInput(id){
+  var n = $('#' + id);
+  if (!n) return '';
+  return parseDateVN(n.value) || n.getAttribute('data-iso') || '';
+}
+function setDateInput(id, iso){
+  var n = $('#' + id);
+  if (!n) return;
+  n.value = dateInputVN(iso);
+  n.setAttribute('data-iso', iso || '');
+  var nat = $('#' + id + 'Native');
+  if (nat) nat.value = iso || '';
+}
+function bindDateInput(id){
+  var n = $('#' + id), nat = $('#' + id + 'Native');
+  if (!n) return;
+  n.addEventListener('change', function(){
+    if (!n.value.trim()) { setDateInput(id, todayISO()); return; }
+    var iso = parseDateVN(n.value);
+    if (iso) { setDateInput(id, iso); return; }
+    var prev = n.getAttribute('data-iso') || '';
+    n.value = dateInputVN(prev);
+    toast(prev ? 'Ngày không hợp lệ, giữ nguyên ngày cũ' : 'Ngày không hợp lệ, dùng hôm nay', 'error');
+    if (!prev) setDateInput(id, todayISO());
+  });
+  if (nat) {
+    var syncNat = function(){ nat.value = parseDateVN(n.value) || todayISO(); };
+    nat.addEventListener('focus', syncNat);
+    nat.addEventListener('click', syncNat);
+    nat.addEventListener('change', function(){ if (nat.value) setDateInput(id, nat.value); });
+  }
+}
+function parseMonthVN(s){
+  s = String(s || '').trim();
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    var y0 = +s.slice(0, 4), m0 = +s.slice(5, 7);
+    return (y0 >= 1900 && y0 <= 2100 && m0 >= 1 && m0 <= 12) ? s : '';
+  }
+  var m = s.match(/^(\d{1,2})[\/\-.](\d{4})$/);
+  if (!m) return '';
+  var mo = +m[1], y = +m[2];
+  return (y >= 1900 && y <= 2100 && mo >= 1 && mo <= 12) ? y + '-' + pad2(mo) : '';
+}
+function monthInputVN(ym){
+  var p = String(ym || '').split('-');
+  return p.length === 2 ? p[1] + '/' + p[0] : '';
+}
+function getMonthInput(id){
+  var n = $('#' + id);
+  if (!n) return '';
+  return parseMonthVN(n.value) || n.getAttribute('data-ym') || '';
+}
+function setMonthInput(id, ym){
+  var n = $('#' + id);
+  if (!n) return;
+  n.value = monthInputVN(ym);
+  n.setAttribute('data-ym', ym || '');
+  var nat = $('#' + id + 'Native');
+  if (nat) nat.value = ym || '';
+}
+function bindMonthInput(id, onChange){
+  var n = $('#' + id), nat = $('#' + id + 'Native');
+  if (!n) return;
+  n.addEventListener('change', function(){
+    var ym = parseMonthVN(n.value);
+    if (ym) { setMonthInput(id, ym); onChange(); return; }
+    if (!n.value.trim()) { setMonthInput(id, ''); onChange(); return; }
+    setMonthInput(id, n.getAttribute('data-ym') || '');
+    toast('Tháng không hợp lệ, dùng mm/yyyy', 'error');
+  });
+  if (nat) {
+    var syncNat = function(){ nat.value = parseMonthVN(n.value) || ''; };
+    nat.addEventListener('focus', syncNat);
+    nat.addEventListener('click', syncNat);
+    nat.addEventListener('change', function(){
+      if (nat.value) { setMonthInput(id, nat.value); onChange(); }
+    });
+  }
+}
 function uid(p){ return p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function capWords(s){
   if (!s) return '';
@@ -1077,13 +1217,40 @@ function findProduct(id){
   for (var i = 0; i < db.products.length; i++) if (String(db.products[i].id) === String(id)) return db.products[i];
   return null;
 }
+var txIndex = null;
+function indexTx(){
+  txIndex = {};
+  db.transactions.forEach(function(t, i){ txIndex[t.id] = i; });
+}
+function tsFromId(id){
+  var m = String(id || '').match(/(\d{10,13})$/);
+  if (!m) return 0;
+  var v = Number(m[1]);
+  return (v > 946684800000 && v < 4102444800000) ? v : 0;
+}
+function txStamp(t){
+  var ts = num(t.ts);
+  if (ts > 0) return ts;
+  var idTs = tsFromId(t.id);
+  if (idTs) return idTs;
+  var base = Date.parse(String(t.date || '') + 'T00:00:00');
+  if (!isFinite(base)) base = 0;
+  if (!txIndex) indexTx();
+  return base + (txIndex[t.id] || 0);
+}
+function txHasTime(t){
+  return num(t.ts) > 0 || tsFromId(t.id) > 0;
+}
 function lastImport(id){
-  var best = null;
+  var best = null, bestStamp = -Infinity;
   db.transactions.forEach(function(t){
     if (t.type !== 'NHAP' || String(t.productId) !== String(id) || !(num(t.price) > 0)) return;
-    if (!best || String(t.date) >= String(best.date)) best = t;
+    var s = txStamp(t);
+    if (!best || String(t.date) > String(best.date) || (String(t.date) === String(best.date) && s >= bestStamp)) {
+      best = t; bestStamp = s;
+    }
   });
-  return best ? { price: num(best.price), date: String(best.date) } : null;
+  return best ? { price: num(best.price), date: String(best.date), ts: bestStamp, hasTime: txHasTime(best) } : null;
 }
 function refPrice(p){
   var l = lastImport(p.id);
@@ -1096,7 +1263,6 @@ var PAGE_SIZE = 10;
 var db = { products: [], transactions: [], prescriptions: [], updatedAt: 0 };
 var invPage = 1, impPage = 1, expPage = 1;
 var impAll = false, expAll = false;
-var impSel = '';
 var cloudBase = 0;
 var conflictOpen = false;
 var toastTimer = null;
@@ -1104,15 +1270,15 @@ var toastTimer = null;
 function sanitize(d){
   var o = { products: [], transactions: [], prescriptions: [], updatedAt: 0 };
   if (!d || typeof d !== 'object') return o;
-  o.updatedAt = num(d.updatedAt);
+  o.updatedAt = dec(d.updatedAt);
   if (Array.isArray(d.products)) {
     d.products.forEach(function(p){
       if (!p || !p.name) return;
       o.products.push({
         id: String(p.id || uid('PROD')),
         name: String(p.name),
-        stock: num(p.stock),
-        costPrice: num(p.costPrice)
+        stock: dec(p.stock),
+        costPrice: dec(p.costPrice)
       });
     });
   }
@@ -1124,18 +1290,19 @@ function sanitize(d){
         date: String(t.date || ''),
         type: t.type === 'NHAP' ? 'NHAP' : 'BAN',
         productId: String(t.productId || ''),
-        qty: num(t.qty),
-        price: num(t.price),
-        total: num(t.total),
-        cost: t.cost == null ? null : num(t.cost)
+        qty: dec(t.qty),
+        price: dec(t.price),
+        total: dec(t.total),
+        cost: t.cost == null ? null : dec(t.cost)
       };
       if (t.oid && t.oname) { tx.oid = String(t.oid); tx.oname = String(t.oname); }
       else if (t.oid && tx.type === 'NHAP') { tx.oid = String(t.oid); }
       if (t.retail) tx.retail = true;
       if (t.rx) tx.rx = true;
-      if (t.g != null) tx.g = num(t.g);
-      if (t.thang != null) tx.thang = num(t.thang);
-      if (t.unitPrice != null) tx.unitPrice = num(t.unitPrice);
+      if (t.g != null) tx.g = dec(t.g);
+      if (t.thang != null) tx.thang = dec(t.thang);
+      if (t.unitPrice != null) tx.unitPrice = dec(t.unitPrice);
+      if (num(t.ts) > 0) tx.ts = num(t.ts);
       o.transactions.push(tx);
     });
   }
@@ -1145,16 +1312,16 @@ function sanitize(d){
       var items = [];
       r.items.forEach(function(it){
         if (!it || !it.productId) return;
-        items.push({ productId: String(it.productId), grams: num(it.grams) });
+        items.push({ productId: String(it.productId), grams: dec(it.grams) });
       });
       if (!items.length) return;
       o.prescriptions.push({
         id: String(r.id || uid('RX')),
         name: String(r.name),
         items: items,
-        total: num(r.total),
+        total: dec(r.total),
         thang: Math.max(1, Math.round(num(r.thang)) || 1),
-        updatedAt: num(r.updatedAt)
+        updatedAt: dec(r.updatedAt)
       });
     });
   }
@@ -1243,9 +1410,9 @@ function orderEmpty(tb, cols, text){
   tb.appendChild(tr);
 }
 function fmtGram(g){
-  var n = r2(num(g));
-  if (n >= 1000) return NF2.format(r2(n / 1000)) + ' kg';
-  return NF2.format(n) + ' g';
+  var n = dec(g);
+  if (Math.abs(n) >= 1000) return fmtNum(dec(n / 1000)) + ' kg';
+  return fmtNum(n) + ' g';
 }
 var remedyItems = [];
 var remedyNotePage = 1;
@@ -1257,7 +1424,7 @@ function commitRemedyRow(){
   if (!row) return;
   var g = num($('.remedy-qty', row).value);
   if (g > 0) {
-    remedyItems.push({ productId: row.getAttribute('data-pid'), grams: r2(g) });
+    remedyItems.push({ productId: row.getAttribute('data-pid'), grams: dec(g) });
     remedyNotePage = 1e9;
   }
   tb.textContent = '';
@@ -1283,7 +1450,7 @@ function remedyNoteSave(){
   if (!it) { remedyEditIdx = -1; renderRemedyNote(); return; }
   var g = num(($('#remedyNoteEditQty') || {}).value);
   if (g <= 0) { toast('Số gram phải lớn hơn 0', 'error'); return; }
-  it.grams = r2(g);
+  it.grams = dec(g);
   remedyEditIdx = -1;
   calcRemedy();
 }
@@ -1530,7 +1697,7 @@ function commitRetailRow(){
   var q = num($('.retail-qty', row).value);
   var m = num($('.retail-money', row).value);
   if (q > 0) {
-    retailItems.push({ pid: row.getAttribute('data-pid'), kg: r2(q), amount: r2(m) });
+    retailItems.push({ pid: row.getAttribute('data-pid'), kg: dec(q), amount: dec(m) });
     notePage = 1e9;
   }
   tb.textContent = '';
@@ -1557,8 +1724,8 @@ function noteSave(){
   var q = num(($('#noteEditQty') || {}).value);
   var m = num(($('#noteEditMoney') || {}).value);
   if (q <= 0) { toast('Số lượng phải lớn hơn 0', 'error'); return; }
-  it.kg = r2(q);
-  it.amount = r2(m);
+  it.kg = dec(q);
+  it.amount = dec(m);
   noteEditIdx = -1;
   calcRetail();
 }
@@ -1575,7 +1742,7 @@ function remedyThang(){
   return v >= 1 ? v : 1;
 }
 function remedyGrand(){
-  return r2(remedyThang() * num(($('#remedyUnitPrice') || {}).value));
+  return dec(remedyThang() * num(($('#remedyUnitPrice') || {}).value));
 }
 function calcRemedy(){
   var grand = remedyGrand();
@@ -1616,7 +1783,7 @@ function collectRemedyItems(){
   calcRemedy();
   var items = [];
   remedyItems.forEach(function(it){
-    if (num(it.grams) > 0) items.push({ productId: it.productId, grams: r2(it.grams) });
+    if (num(it.grams) > 0) items.push({ productId: it.productId, grams: dec(it.grams) });
   });
   return items;
 }
@@ -1663,7 +1830,7 @@ function loadPreset(id){
   remedyItems = [];
   r.items.forEach(function(it){
     if (!findProduct(it.productId)) return;
-    remedyItems.push({ productId: it.productId, grams: r2(num(it.grams)) });
+    remedyItems.push({ productId: it.productId, grams: dec(num(it.grams)) });
   });
   remedyEditIdx = -1;
   remedyNotePage = 1;
@@ -1674,7 +1841,7 @@ function loadPreset(id){
   var th = $('#remedyThang');
   if (th) th.value = String(thang);
   var up = $('#remedyUnitPrice');
-  if (up) up.value = num(r.total) > 0 ? String(r2(num(r.total) / thang)) : '';
+  if (up) up.value = num(r.total) > 0 ? String(dec(num(r.total) / thang)) : '';
   renumber(tb);
   calcRemedy();
   updatePresetUI();
@@ -1714,12 +1881,12 @@ function savePreset(){
   if (cur) {
     cur.name = name;
     cur.items = items;
-    cur.total = r2(grand);
+    cur.total = dec(grand);
     cur.thang = thang;
     cur.updatedAt = Date.now();
     msg = 'Đã cập nhật đơn "' + name + '"';
   } else {
-    cur = { id: uid('RX'), name: name, items: items, total: r2(grand), thang: thang, updatedAt: Date.now() };
+    cur = { id: uid('RX'), name: name, items: items, total: dec(grand), thang: thang, updatedAt: Date.now() };
     db.prescriptions.push(cur);
     msg = 'Đã lưu đơn "' + name + '"';
   }
@@ -1752,7 +1919,7 @@ function copyPreset(){
     id: uid('RX'),
     name: name,
     items: items,
-    total: r2(remedyGrand()),
+    total: dec(remedyGrand()),
     thang: remedyThang(),
     updatedAt: Date.now()
   };
@@ -1771,13 +1938,14 @@ function commit(msg){
   if (msg) toast(msg);
 }
 function saveRetail(){
-  var date = ($('#retailDate') || {}).value || todayISO();
+  var date = getDateInput('retailDate') || todayISO();
   commitRetailRow();
   var items = retailItems.map(function(it){ return { pid: it.pid, kg: it.kg, amount: it.amount }; });
   if (!items.length) { toast('Chọn vị thuốc và nhập số lượng hợp lệ', 'error'); return; }
 
   var oname = 'Bán lẻ';
   var oid = items.length > 1 ? uid('OD') : null;
+  var ts = Date.now();
 
   var need = {};
   items.forEach(function(it){ need[it.pid] = (need[it.pid] || 0) + it.kg; });
@@ -1791,11 +1959,11 @@ function saveRetail(){
   }
   items.forEach(function(it){
     var p = findProduct(it.pid);
-    p.stock = r2(p.stock - it.kg);
+    p.stock = dec(p.stock - it.kg);
     var tx = {
       id: uid('TX'), date: date, type: 'BAN', productId: it.pid,
-      qty: r2(it.kg), price: it.kg > 0 ? r2(it.amount / it.kg) : 0,
-      total: r2(it.amount), cost: r2(it.kg * num(p.costPrice))
+      qty: dec(it.kg), price: it.kg > 0 ? dec(it.amount / it.kg) : 0,
+      total: dec(it.amount), cost: dec(it.kg * num(p.costPrice)), ts: ts
     };
     if (oid) { tx.oid = oid; tx.oname = oname; tx.retail = true; }
     db.transactions.push(tx);
@@ -1804,7 +1972,7 @@ function saveRetail(){
   commit('Đã lưu đơn bán lẻ');
 }
 function saveRemedy(){
-  var date = ($('#remedyDate') || {}).value || todayISO();
+  var date = getDateInput('remedyDate') || todayISO();
   var grand = remedyGrand();
   commitRemedyRow();
   calcRemedy();
@@ -1828,16 +1996,18 @@ function saveRemedy(){
   }
   var oname = capWords(($('#remedyName') || {}).value) || 'Đơn thuốc lẻ';
   var oid = uid('OD');
+  var ts = Date.now();
   items.forEach(function(it){
     var p = findProduct(it.pid);
     var kg = it.g / 1000 * thang;
-    p.stock = r2(p.stock - kg);
+    p.stock = dec(p.stock - kg);
     var amount = totalG > 0 ? grand * (it.g / totalG) : 0;
     var tx = {
       id: uid('TX'), date: date, type: 'BAN', productId: it.pid,
-      qty: r2(kg), price: kg > 0 ? r2(amount / kg) : 0,
-      total: r2(amount), cost: r2(kg * num(p.costPrice)),
-      rx: true, g: r2(it.g), thang: thang, unitPrice: thang > 0 ? r2(grand / thang) : 0
+      qty: dec(kg), price: kg > 0 ? dec(amount / kg) : 0,
+      total: dec(amount), cost: dec(kg * num(p.costPrice)),
+      rx: true, g: dec(it.g), thang: thang, unitPrice: thang > 0 ? dec(grand / thang) : 0,
+      ts: ts
     };
     if (oid) { tx.oid = oid; tx.oname = oname; }
     db.transactions.push(tx);
@@ -2000,46 +2170,35 @@ function renderInventory(){
 }
 
 /* ================= LỊCH SỬ ================= */
-function sortTx(list){
-  var names = {};
-  list.forEach(function(t){
-    var p = findProduct(t.productId);
-    names[t.id] = p ? p.name : null;
-  });
-  list.sort(function(a, b){
-    var na = names[a.id], nb = names[b.id];
-    if (na === null && nb !== null) return 1;
-    if (nb === null && na !== null) return -1;
-    var c = (na || '').localeCompare(nb || '', 'vi', { sensitivity: 'base' });
-    if (c) return c;
-    return String(b.date) > String(a.date) ? 1 : String(b.date) < String(a.date) ? -1 : 0;
-  });
-  return list;
-}
 function txName(t){
   var p = findProduct(t.productId);
   return p ? p.name : null;
 }
-function appendOrderRow(tbody, g){
+function timeVN(ts){
+  var d = new Date(num(ts));
+  if (!isFinite(d.getTime())) return '';
+  return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+function appendOrderRow(tbody, r, isImp){
   var tr = el('tr');
   tr.className = 'is-row';
-  tr.appendChild(el('td', 'muted small', g.date));
+  tr.appendChild(el('td', 'muted small', dateVN(r.date) + (r.hasTime ? ' ' + timeVN(r.ts) : '')));
   var tn = el('td', 'b');
-  var nameBtn = el('button', 'linkbtn', g.oname);
+  var nameBtn = el('button', 'linkbtn', r.oname);
   nameBtn.type = 'button';
   nameBtn.setAttribute('data-action', 'order-view');
-  nameBtn.setAttribute('data-oid', g.oid);
-  nameBtn.setAttribute('aria-label', 'Xem danh sách đơn ' + g.oname + ' ngày ' + g.date);
+  nameBtn.setAttribute('data-oid', r.oid);
+  nameBtn.setAttribute('aria-label', 'Xem chi tiết ' + r.oname + ' ngày ' + dateVN(r.date));
   tn.appendChild(nameBtn);
-  tn.appendChild(el('span', 'muted small', ' · ' + g.n + ' vị'));
+  tn.appendChild(el('span', 'muted small', ' · ' + r.n + ' vị'));
   tr.appendChild(tn);
-  var cQty = el('td', 'num', fmtQty(g.qty));
+  var cQty = el('td', 'num', fmtQty(r.qty));
   cQty.setAttribute('data-label', 'SL');
   tr.appendChild(cQty);
   var cPrice = el('td', 'num muted', '—');
   cPrice.setAttribute('data-label', 'Đơn giá');
   tr.appendChild(cPrice);
-  var cTotal = el('td', 'num b txt-green', fmtMoney(g.total));
+  var cTotal = el('td', 'num b ' + (isImp ? 'txt-blue' : 'txt-green'), fmtMoney(r.total));
   cTotal.setAttribute('data-label', 'Thành tiền');
   tr.appendChild(cTotal);
   var td = el('td', 'c-act');
@@ -2047,8 +2206,8 @@ function appendOrderRow(tbody, g){
   var bd = el('button', 'btn btn--icon btn--danger');
   bd.type = 'button';
   bd.setAttribute('data-action', 'del-order');
-  bd.setAttribute('data-id', g.oid);
-  bd.setAttribute('aria-label', 'Xóa đơn ' + g.oname + ' ngày ' + g.date);
+  bd.setAttribute('data-id', r.oid);
+  bd.setAttribute('aria-label', 'Xóa ' + r.oname + ' ngày ' + dateVN(r.date));
   bd.appendChild(svg('trash'));
   wrap.appendChild(bd);
   td.appendChild(wrap);
@@ -2058,28 +2217,35 @@ function appendOrderRow(tbody, g){
 var orderCur = null, orderPage = 1;
 function renderOrder(){
   var items = db.transactions.filter(function(t){
-    return t.type === 'BAN' && t.oid && String(t.oid) === String(orderCur);
+    return t.oid && String(t.oid) === String(orderCur);
   });
   var tb = $('#orderBody');
   if (!items.length || !tb) return;
   var first = items[0];
-  var oname = first.oname || 'Chi tiết đơn';
-  var isRetail = items.some(function(t){ return t.retail; }) || oname === 'Bán lẻ';
-  var preset = isRetail ? null : presetByName(oname);
+  var isImp = first.type === 'NHAP';
+  var oname = first.oname || '';
+  var isRetail = !isImp && (items.some(function(t){ return t.retail; }) || oname === 'Bán lẻ');
+  var preset = (!isImp && !isRetail) ? presetByName(oname) : null;
   var metaThang = 0, metaUnit = 0;
   items.forEach(function(t){
     if (num(t.thang) > 0) metaThang = num(t.thang);
     if (num(t.unitPrice) > 0) metaUnit = num(t.unitPrice);
   });
   var thang = 0;
-  if (!isRetail) {
+  if (!isImp && !isRetail) {
     if (metaThang > 0) thang = Math.max(1, Math.round(metaThang));
     else if (preset) thang = Math.max(1, Math.round(num(preset.thang) || 1));
   }
-  var totalMoney = 0, totalKg = 0;
-  items.forEach(function(t){ totalMoney += num(t.total); totalKg += num(t.qty); });
-  var perThang = !isRetail && thang > 0;
-  var unitPrice = perThang ? (metaUnit > 0 ? metaUnit : r2(totalMoney / thang)) : 0;
+  var totalMoney = 0, totalKg = 0, maxTs = 0, hasTime = false;
+  items.forEach(function(t){
+    totalMoney += num(t.total);
+    totalKg += num(t.qty);
+    var s = txStamp(t);
+    if (s > maxTs) maxTs = s;
+    if (txHasTime(t)) hasTime = true;
+  });
+  var perThang = !isImp && thang > 0;
+  var unitPrice = perThang ? (metaUnit > 0 ? metaUnit : dec(totalMoney / thang)) : 0;
 
   var gramsPerThang = 0;
   items.forEach(function(t){
@@ -2088,12 +2254,16 @@ function renderOrder(){
 
   var qtyHead = $('#orderQtyHead');
   if (qtyHead) qtyHead.textContent = perThang ? 'SL (gram)' : 'SL';
+  var priceHead = $('#orderPriceHead');
+  if (priceHead) priceHead.hidden = !isImp;
   var moneyHead = $('#orderMoneyHead');
   if (moneyHead) moneyHead.hidden = perThang;
   var footLabel = $('#orderFootLabel');
   if (footLabel) footLabel.textContent = perThang ? 'Tổng 1 thang' : 'Tổng cộng';
   var footQty = $('#orderFootQty');
   if (footQty) footQty.textContent = perThang ? fmtGram(gramsPerThang) : fmtQty(totalKg);
+  var footPrice = $('#orderFootPrice');
+  if (footPrice) { footPrice.hidden = !isImp; footPrice.textContent = '—'; }
   var footMoney = $('#orderFootMoney');
   if (footMoney) {
     footMoney.hidden = perThang;
@@ -2102,7 +2272,7 @@ function renderOrder(){
 
   var meta = $('#orderMeta');
   if (meta) {
-    var parts = ['Ngày ' + dateVN(first.date), items.length + ' vị'];
+    var parts = ['Ngày ' + dateVN(first.date) + (hasTime ? ' ' + timeVN(maxTs) : ''), items.length + ' vị'];
     if (perThang) {
       parts.push(fmtQty(gramsPerThang / 1000) + '/thang');
       if (thang > 1) parts.push('tổng ' + thang + ' thang: ' + fmtQty(totalKg));
@@ -2112,9 +2282,9 @@ function renderOrder(){
     meta.textContent = parts.join(' · ');
   }
   var title = $('#orderTitle');
-  if (title) title.textContent = oname;
+  if (title) title.textContent = isImp ? ('Đơn nhập ngày ' + dateVN(first.date)) : oname;
   var noteTitle = $('#orderNoteTitle');
-  if (noteTitle) noteTitle.textContent = perThang ? 'Tờ ghi đơn thuốc chén' : (isRetail ? 'Tờ ghi đơn bán lẻ' : 'Tờ ghi đơn');
+  if (noteTitle) noteTitle.textContent = isImp ? 'Tờ ghi nhập hàng' : (perThang ? 'Tờ ghi đơn thuốc chén' : (isRetail ? 'Tờ ghi đơn bán lẻ' : 'Tờ ghi đơn'));
 
   var pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   if (orderPage > pages) orderPage = pages;
@@ -2132,7 +2302,8 @@ function renderOrder(){
       tr.appendChild(el('td', 'num', fmtGram(g)));
     } else {
       tr.appendChild(el('td', 'num', fmtQty(t.qty)));
-      tr.appendChild(el('td', 'num b txt-green', fmtMoney(t.total)));
+      if (isImp) tr.appendChild(el('td', 'num', fmtUnitPrice(t.price)));
+      tr.appendChild(el('td', 'num b ' + (isImp ? 'txt-blue' : 'txt-green'), fmtMoney(t.total)));
     }
     tb.appendChild(tr);
   });
@@ -2171,208 +2342,128 @@ function dateVN(iso){
   var d = String(iso || '').split('-');
   return d.length === 3 ? d[2] + '/' + d[1] + '/' + d[0] : 'Không rõ ngày';
 }
-function impBatches(){
-  var map = {}, list = [];
-  db.transactions.forEach(function(t, idx){
-    if (t.type !== 'NHAP') return;
-    var key = t.oid ? String(t.oid) : 'D_' + t.date;
-    var g = map[key];
-    if (!g) { g = map[key] = { key: key, date: String(t.date || ''), items: [], total: 0, first: idx }; list.push(g); }
-    g.items.push(t);
-    g.total += num(t.total);
-  });
-  var perDate = {};
-  list.forEach(function(g){ perDate[g.date] = (perDate[g.date] || 0) + 1; });
-  var seen = {};
-  list.slice().sort(function(a, b){ return a.first - b.first; }).forEach(function(g){
-    seen[g.date] = (seen[g.date] || 0) + 1;
-    g.nth = seen[g.date];
-    g.sameDay = perDate[g.date];
-  });
-  list.sort(function(a, b){
-    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
-    return b.first - a.first;
-  });
-  return list;
-}
-function impBatchLabel(g){
-  return dateVN(g.date) + (g.sameDay > 1 ? ' · lần ' + g.nth : '') + ' · ' + g.items.length + ' vị · ' + fmtMoney(g.total);
-}
-function renderImpNote(){
-  var sel = $('#impBatch');
-  var tb = $('#impNoteBody');
-  if (!sel || !tb) return;
-  var month = ($('#impMonth') || {}).value || '';
-  var all = impBatches();
-  var list = all.filter(function(g){ return !month || g.date.indexOf(month) === 0; });
-  var cur = null;
-  list.forEach(function(g){ if (g.key === impSel) cur = g; });
-  if (!cur && list.length) { cur = list[0]; impSel = cur.key; impPage = 1; }
-  if (!cur) impSel = '';
-
-  sel.textContent = '';
-  list.forEach(function(g){
-    var o = el('option', '', impBatchLabel(g));
-    o.value = g.key;
-    if (cur && g.key === cur.key) o.selected = true;
-    sel.appendChild(o);
-  });
-  if (!list.length) {
-    var o0 = el('option', '', 'Chưa có lần nhập nào');
-    o0.value = '';
-    sel.appendChild(o0);
-  }
-  sel.disabled = !list.length;
-
-  var count = $('#impCount');
-  if (count) count.textContent = list.length + ' lần nhập' + (all.length ? ' · gần nhất ' + dateVN(all[0].date) : '');
-
-  var items = cur ? cur.items : [];
-  var pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  if (impPage > pages) impPage = pages;
-  if (impPage < 1) impPage = 1;
-  var sum = 0;
-  items.forEach(function(t){ sum += num(t.total); });
-
-  tb.textContent = '';
-  for (var k = 0; k < PAGE_SIZE; k++) {
-    var i = (impPage - 1) * PAGE_SIZE + k;
-    var t = items[i];
-    var tr = el('tr');
-    if (!t) {
-      tr.appendChild(el('td', 'c-num', ''));
-      tr.appendChild(el('td', '', ''));
-      tr.appendChild(el('td', '', ''));
-      tr.appendChild(el('td', '', ''));
-      tr.appendChild(el('td', 'c-act', ''));
-      tb.appendChild(tr);
-      continue;
-    }
-    var name = txName(t);
-    tr.appendChild(el('td', 'c-num num muted', String(i + 1)));
-    tr.appendChild(el('td', 'b', name === null ? 'Đã xóa' : name));
-    tr.appendChild(el('td', 'num', fmtQty(t.qty)));
-    tr.appendChild(el('td', 'num r', fmtMoney(t.price)));
-    var td = el('td', 'c-act');
-    var wrap = el('div', 'inline-row');
-    var be = el('button', 'btn btn--icon');
-    be.type = 'button';
-    be.setAttribute('data-action', 'tx-edit');
-    be.setAttribute('data-id', t.id);
-    be.setAttribute('aria-label', 'Sửa dòng ' + (i + 1));
-    be.appendChild(svg('edit'));
-    var bd = el('button', 'btn btn--icon btn--danger');
-    bd.type = 'button';
-    bd.setAttribute('data-action', 'del-tx');
-    bd.setAttribute('data-id', t.id);
-    bd.setAttribute('aria-label', 'Xóa dòng ' + (i + 1));
-    bd.appendChild(svg('trash'));
-    wrap.appendChild(be);
-    wrap.appendChild(bd);
-    td.appendChild(wrap);
-    tr.appendChild(td);
-    tb.appendChild(tr);
-  }
-  var title = $('#impNoteTitle');
-  if (title) title.textContent = cur ? 'Tờ ghi nhập hàng · ' + dateVN(cur.date) + (cur.sameDay > 1 ? ' · lần ' + cur.nth : '') : 'Tờ ghi nhập hàng';
-  var tot = $('#impNoteTotal');
-  if (tot) tot.textContent = fmtMoney(sum);
-  var pg = $('#impNotePg');
-  if (pg) pg.textContent = 'Trang ' + impPage + ' / ' + pages;
-  var host = $('#impPager');
-  if (host) {
-    host.hidden = pages <= 1;
-    if (pages > 1) renderPager(host, impPage, pages, 'imp');
-  }
-  var meta = $('#impNoteMeta');
-  if (meta) meta.textContent = cur ? items.length + ' vị thuốc trong lần nhập này' : '';
-  var del = $('#impDelBatch');
-  if (del) del.hidden = !cur;
-}
-function delImpBatch(){
-  var cur = null;
-  impBatches().forEach(function(g){ if (g.key === impSel) cur = g; });
-  if (!cur) return;
-  if (!confirm('Xóa cả lần nhập ngày ' + dateVN(cur.date) + ' (' + cur.items.length + ' vị thuốc)? Tồn kho sẽ được điều chỉnh lại.')) return;
-  var ids = {};
-  cur.items.forEach(function(t){
-    ids[t.id] = true;
-    var p = findProduct(t.productId);
-    if (p) p.stock = r2(p.stock - num(t.qty));
-  });
-  db.transactions = db.transactions.filter(function(x){ return !ids[x.id]; });
-  impSel = '';
-  impPage = 1;
-  commit('Đã xóa lần nhập');
-}
-function renderHistory(kind){
-  if (kind === 'imp') { renderImpNote(); return; }
-  updateMergeBtn();
+function historyData(kind, month, latestOnly){
   var isImp = kind === 'imp';
-  var tbody = $('#' + kind + 'Body');
-  if (!tbody) return;
-  tbody.textContent = '';
-  var month = ($('#' + kind + 'Month') || {}).value || '';
+  indexTx();
   var list = db.transactions.filter(function(t){
     if (t.type !== (isImp ? 'NHAP' : 'BAN')) return false;
-    return !month || (t.date && t.date.indexOf(month) === 0);
+    return !month || (t.date && String(t.date).indexOf(month) === 0);
   });
-  var latest = '';
-  if (!month && !(isImp ? impAll : expAll)) {
-    list.forEach(function(t){ if (t.date && String(t.date) > latest) latest = String(t.date); });
-    if (latest) list = list.filter(function(t){ return t.date === latest; });
+
+  var oidCount = {};
+  if (isImp) {
+    list.forEach(function(t){ if (t.oid) oidCount[t.oid] = (oidCount[t.oid] || 0) + 1; });
   }
-  sortTx(list);
-  var rows = list;
-  if (!isImp) {
-    var seen = {}, grouped = [];
-    list.forEach(function(t){
-      if (!t.oid || !t.oname) { grouped.push(t); return; }
-      var g = seen[t.oid];
-      if (!g) {
-        g = seen[t.oid] = { group: true, oid: t.oid, oname: t.oname, date: t.date, qty: 0, total: 0, n: 0 };
-        grouped.push(g);
-      }
-      g.qty += num(t.qty); g.total += num(t.total); g.n++;
+
+  var map = {}, rows = [];
+  list.forEach(function(t){
+    var groupable = !!t.oid && (isImp ? oidCount[t.oid] > 1 : !!t.oname);
+    if (!groupable) {
+      rows.push({
+        single: true, tx: t,
+        date: String(t.date || ''),
+        ts: txStamp(t), hasTime: txHasTime(t),
+        name: txName(t), qty: num(t.qty), total: num(t.total), price: num(t.price)
+      });
+      return;
+    }
+    var g = map[t.oid];
+    if (!g) {
+      g = map[t.oid] = {
+        group: true, oid: t.oid, oname: t.oname || '',
+        date: String(t.date || ''), ts: txStamp(t), hasTime: txHasTime(t),
+        qty: 0, total: 0, n: 0, items: [], name: ''
+      };
+      rows.push(g);
+    }
+    g.items.push(t);
+    g.qty += num(t.qty);
+    g.total += num(t.total);
+    g.n++;
+    var s = txStamp(t);
+    if (s > g.ts) g.ts = s;
+    if (txHasTime(t)) g.hasTime = true;
+  });
+
+  rows.forEach(function(r){
+    if (!r.group) return;
+    if (!r.oname) {
+      r.oname = isImp ? ('Đơn nhập ngày ' + dateVN(r.date) + (r.hasTime ? ' · ' + timeVN(r.ts) : '')) : 'Đơn';
+    }
+    r.name = r.oname;
+  });
+
+  var latestDate = '', latestTs = -Infinity, latestHasTime = false;
+  rows.forEach(function(r){
+    if (!r.date) return;
+    if (r.date > latestDate || (r.date === latestDate && r.ts > latestTs)) {
+      latestDate = r.date;
+      latestTs = r.ts;
+      latestHasTime = r.hasTime;
+    }
+  });
+
+  if (latestOnly) {
+    var latestMin = Math.floor(latestTs / 60000);
+    rows = rows.filter(function(r){
+      return r.date === latestDate && Math.floor(r.ts / 60000) === latestMin;
     });
-    grouped.sort(function(x, y){
-      var nx = x.group ? x.oname : txName(x);
-      var ny = y.group ? y.oname : txName(y);
-      if (nx === null && ny !== null) return 1;
-      if (ny === null && nx !== null) return -1;
-      var c = (nx || '').localeCompare(ny || '', 'vi', { sensitivity: 'base' });
+    rows.sort(function(a, b){ return b.ts - a.ts; });
+  } else {
+    rows.sort(function(a, b){
+      var na = a.name, nb = b.name;
+      if (na === null && nb !== null) return 1;
+      if (nb === null && na !== null) return -1;
+      var c = (na || '').localeCompare(nb || '', 'vi', { sensitivity: 'base' });
       if (c) return c;
-      return String(y.date) > String(x.date) ? 1 : String(y.date) < String(x.date) ? -1 : 0;
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return b.ts - a.ts;
     });
-    rows = grouped;
   }
-  list = rows;
+
+  return { rows: rows, latestDate: latestDate, latestTs: latestTs, latestHasTime: latestHasTime };
+}
+function renderHistory(kind){
+  var isImp = kind === 'imp';
+  if (!isImp) updateMergeBtn();
+  var tbody = $('#' + kind + 'Body');
+  if (!tbody) return;
+  var month = getMonthInput(isImp ? 'impMonth' : 'expMonth');
+  var latestOnly = !month && !(isImp ? impAll : expAll);
+  var data = historyData(kind, month, latestOnly);
+  var rows = data.rows;
 
   var count = $('#' + kind + 'Count');
   if (count) {
-    var dd = latest.split('-');
-    count.textContent = list.length + ' giao dịch' + (latest && dd.length === 3
-      ? ' · ' + (isImp ? 'nhập' : 'bán') + ' gần nhất ' + dd[2] + '/' + dd[1] + '/' + dd[0] : '');
+    var suffix = '';
+    if (data.latestDate) {
+      suffix = ' · ' + (isImp ? 'nhập' : 'bán') + ' gần nhất ' + dateVN(data.latestDate) +
+        (data.latestHasTime ? ' ' + timeVN(data.latestTs) : '');
+    }
+    count.textContent = rows.length + (isImp ? ' lần nhập' : ' giao dịch') + suffix;
   }
 
-  if (!list.length) {
+  tbody.textContent = '';
+  if (!rows.length) {
     emptyRow(tbody, 6, isImp ? 'Không có giao dịch nhập.' : 'Không có giao dịch bán.');
     renderPager($('#' + kind + 'Pager'), 1, 1, kind);
     return;
   }
 
   var page = isImp ? impPage : expPage;
-  var totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
+  var totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
   if (page > totalPages) page = totalPages;
+  if (page < 1) page = 1;
   if (isImp) impPage = page; else expPage = page;
-  var slice = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  var slice = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  slice.forEach(function(t){
-    if (t.group) { appendOrderRow(tbody, t); return; }
+  slice.forEach(function(r){
+    if (r.group) { appendOrderRow(tbody, r, isImp); return; }
+    var t = r.tx;
     var tr = el('tr');
     tr.className = 'is-row';
-    tr.appendChild(el('td', 'muted small', t.date));
-    var name = txName(t);
+    tr.appendChild(el('td', 'muted small', dateVN(t.date) + (r.hasTime ? ' ' + timeVN(r.ts) : '')));
+    var name = r.name;
     tr.appendChild(el('td', 'b', name === null ? 'Đã xóa' : name));
     var cQty = el('td', 'num', fmtQty(t.qty));
     cQty.setAttribute('data-label', 'SL');
@@ -2389,13 +2480,13 @@ function renderHistory(kind){
     be.type = 'button';
     be.setAttribute('data-action', 'tx-edit');
     be.setAttribute('data-id', t.id);
-    be.setAttribute('aria-label', 'Sửa giao dịch ngày ' + t.date);
+    be.setAttribute('aria-label', 'Sửa giao dịch ngày ' + dateVN(t.date));
     be.appendChild(svg('edit'));
     var bd = el('button', 'btn btn--icon btn--danger');
     bd.type = 'button';
     bd.setAttribute('data-action', 'del-tx');
     bd.setAttribute('data-id', t.id);
-    bd.setAttribute('aria-label', 'Xóa giao dịch ngày ' + t.date);
+    bd.setAttribute('aria-label', 'Xóa giao dịch ngày ' + dateVN(t.date));
     bd.appendChild(svg('trash'));
     wrap.appendChild(be);
     wrap.appendChild(bd);
@@ -2405,14 +2496,13 @@ function renderHistory(kind){
   });
   renderPager($('#' + kind + 'Pager'), page, totalPages, kind);
 }
-
 /* ================= GỘP ĐƠN THUỐC LẺ CŨ ================= */
 function mergeCandidates(){
   var map = {}, list = [];
   db.transactions.forEach(function(t){
     if (t.type !== 'BAN' || t.oid) return;
-    var price = r2(num(t.price));
-    var key = t.date + '|' + price.toFixed(2);
+    var price = dec(num(t.price));
+    var key = t.date + '|' + String(dec(price));
     var g = map[key];
     if (!g) { g = map[key] = { key: key, date: String(t.date || ''), price: price, items: [], total: 0 }; list.push(g); }
     g.items.push(t);
@@ -2491,14 +2581,14 @@ function reconcileList(){
   });
   var res = [];
   db.products.forEach(function(p){
-    var calc = r2((inn[p.id] || 0) - (out[p.id] || 0));
-    var diff = r2(num(p.stock) - calc);
-    if (Math.abs(diff) > 0.005) res.push({ id: p.id, name: p.name, stock: num(p.stock), calc: calc, diff: diff });
+    var calc = dec((inn[p.id] || 0) - (out[p.id] || 0));
+    var diff = dec(num(p.stock) - calc);
+    if (Math.abs(diff) > 1e-9) res.push({ id: p.id, name: p.name, stock: num(p.stock), calc: calc, diff: diff });
   });
   res.sort(function(a, b){ return Math.abs(b.diff) - Math.abs(a.diff); });
   return res;
 }
-function fmtKgExact(v){ return NF2.format(r2(v)) + ' kg'; }
+function fmtKgExact(v){ return fmtNum(v) + ' kg'; }
 function renderRec(){
   var tb = $('#recBody');
   if (!tb) return;
@@ -2590,8 +2680,8 @@ function chartData(){
       if (t.type === 'NHAP') { a += v / 1000; ak += v; }
       else { b += v / 1000; bk += v; }
     });
-    imp.push(r2(a)); exp.push(r2(b));
-    impK.push(r2(ak)); expK.push(r2(bk));
+    imp.push(dec(a)); exp.push(dec(b));
+    impK.push(dec(ak)); expK.push(dec(bk));
   }
   return { imp: imp, exp: exp, impK: impK, expK: expK, year: year };
 }
@@ -2908,8 +2998,7 @@ function nhapPick(p){
     if (v > 0) {
       var txt = 'Giá nhập gần nhất: ' + fmtUnitPrice(v);
       if (l && l.date) {
-        var d = l.date.split('-');
-        if (d.length === 3) txt += ' (ngày ' + d[2] + '/' + d[1] + '/' + d[0] + ')';
+        txt += ' (ngày ' + dateVN(l.date) + (l.hasTime ? ' ' + timeVN(l.ts) : '') + ')';
       }
       hint.textContent = txt;
       hint.hidden = false;
@@ -2949,8 +3038,8 @@ function nhapPriceOk(p, price){
   if (!(ref > 0)) return true;
   var ratio = price / ref;
   if (ratio <= 1.5 && ratio >= 0.5) return true;
-  var pct = Math.round((ratio - 1) * 100);
-  return confirm('Giá nhập "' + p.name + '" lần này là ' + fmtUnitPrice(price) + ', chênh ' + (pct > 0 ? '+' : '') + pct + '% so với lần nhập gần nhất (' + fmtUnitPrice(ref) + ').\nBạn có chắc giá này đúng không?');
+  var pct = dec((ratio - 1) * 100);
+  return confirm('Giá nhập "' + p.name + '" lần này là ' + fmtUnitPrice(price) + ', chênh ' + (pct > 0 ? '+' : '') + fmtNum(pct) + '% so với lần nhập gần nhất (' + fmtUnitPrice(ref) + ').\nBạn có chắc giá này đúng không?');
 }
 function renderNhapList(){
   var box = $('#nhapListBox');
@@ -3010,7 +3099,7 @@ function addNhapItem(){
   if (qty <= 0) { toast('Nhập số lượng lớn hơn 0', 'error'); var q = $('#nhapQty'); if (q) q.focus(); return; }
   var p = nhapPid ? findProduct(nhapPid) : findByName(name);
   if (!nhapPriceOk(p, price)) { var pi = $('#nhapPrice'); if (pi) { pi.focus(); pi.select(); } return; }
-  nhapList.push({ pid: p ? p.id : null, name: p ? p.name : name, qty: r2(qty), price: r2(price) });
+  nhapList.push({ pid: p ? p.id : null, name: p ? p.name : name, qty: dec(qty), price: dec(price) });
   resetNhapInputs();
   renderNhapList();
   closeSuggest('nhap');
@@ -3026,36 +3115,37 @@ function saveNhap(e){
     var price = num(($('#nhapPrice') || {}).value);
     var cp = nhapPid ? findProduct(nhapPid) : findByName(name);
     if (qty > 0 && !nhapPriceOk(cp, price)) { var pi2 = $('#nhapPrice'); if (pi2) { pi2.focus(); pi2.select(); } return; }
-    if (qty > 0 || !cp) entries.push({ pid: cp ? cp.id : null, name: name, qty: r2(qty), price: r2(price) });
+    if (qty > 0 || !cp) entries.push({ pid: cp ? cp.id : null, name: name, qty: dec(qty), price: dec(price) });
     else if (!entries.length) { toast('Nhập số lượng lớn hơn 0', 'error'); return; }
   }
   if (!entries.length) { toast('Nhập tên vị thuốc', 'error'); var i0 = $('#nhapSearch'); if (i0) i0.focus(); return; }
 
   var savedN = 0;
   var batchId = uid('IM');
+  var ts = Date.now();
   entries.forEach(function(it){
     var p = it.pid ? findProduct(it.pid) : null;
     if (!p) p = findByName(it.name);
     if (!p) {
-      p = { id: uid('PROD'), name: it.name, stock: 0, costPrice: r2(it.price) };
+      p = { id: uid('PROD'), name: it.name, stock: 0, costPrice: dec(it.price) };
       db.products.push(p);
     }
     if (it.qty > 0) {
-      p.stock = r2(num(p.stock) + it.qty);
-      if (it.price > 0) p.costPrice = r2(it.price);
+      p.stock = dec(num(p.stock) + it.qty);
+      if (it.price > 0) p.costPrice = dec(it.price);
       db.transactions.push({
         id: uid('TX'), date: date, type: 'NHAP', productId: p.id,
-        qty: r2(it.qty), price: r2(it.price), total: r2(it.qty * it.price), cost: null, oid: batchId
+        qty: dec(it.qty), price: dec(it.price), total: dec(it.qty * it.price), cost: null,
+        oid: batchId, ts: ts
       });
       savedN++;
     }
   });
 
   if (savedN > 0) {
-    impSel = batchId;
+    impAll = false;
     impPage = 1;
-    var impM = $('#impMonth');
-    if (impM) impM.value = '';
+    setMonthInput('impMonth', '');
   }
   nhapList = [];
   resetNhapInputs();
@@ -3093,7 +3183,7 @@ function saveEdit(){
   var d = dupName(name, id);
   if (d) { toast('Đã có "' + d.name + '" trong kho', 'error'); return; }
   p.name = name;
-  p.costPrice = r2(price);
+  p.costPrice = dec(price);
   closeEdit();
   commit('Đã cập nhật vị thuốc');
 }
@@ -3115,8 +3205,8 @@ function delTx(id){
   if (!confirm('Xóa giao dịch này? Tồn kho sẽ được điều chỉnh lại.')) return;
   var p = findProduct(t.productId);
   if (p) {
-    if (t.type === 'NHAP') p.stock = r2(p.stock - num(t.qty));
-    else p.stock = r2(p.stock + num(t.qty));
+    if (t.type === 'NHAP') p.stock = dec(p.stock - num(t.qty));
+    else p.stock = dec(p.stock + num(t.qty));
   }
   db.transactions = db.transactions.filter(function(x){ return x.id !== id; });
   commit('Đã xóa giao dịch');
@@ -3132,10 +3222,13 @@ function findTx(id){
 function delOrder(oid){
   var items = db.transactions.filter(function(x){ return x.oid === oid; });
   if (!items.length) return;
-  if (!confirm('Xóa cả đơn "' + items[0].oname + '"? Tồn kho sẽ được điều chỉnh lại.')) return;
+  var label = items[0].oname || (items[0].type === 'NHAP'
+    ? 'đơn nhập ngày ' + dateVN(items[0].date)
+    : 'đơn');
+  if (!confirm('Xóa cả ' + label + '? Tồn kho sẽ được điều chỉnh lại.')) return;
   items.forEach(function(t){
     var p = findProduct(t.productId);
-    if (p) p.stock = r2(p.stock + num(t.qty));
+    if (p) p.stock = dec(p.stock + num(t.qty));
   });
   db.transactions = db.transactions.filter(function(x){ return x.oid !== oid; });
   commit('Đã xóa đơn');
@@ -3147,10 +3240,11 @@ function openTxEdit(id){
   var p = findProduct(t.productId);
   $('#txEditId').value = t.id;
   $('#txEditName').value = p ? p.name : 'Đã xóa';
-  $('#txEditQty').value = String(num(t.qty));
-  $('#txEditPrice').value = String(num(t.price));
+  $('#txEditQty').value = String(dec(t.qty));
+  $('#txEditPrice').value = String(dec(t.price));
   var meta = $('#txEditMeta');
-  if (meta) meta.textContent = (t.type === 'NHAP' ? 'Nhập hàng' : 'Bán hàng') + ' · ngày ' + t.date;
+  if (meta) meta.textContent = (t.type === 'NHAP' ? 'Nhập hàng' : 'Bán hàng') + ' · ngày ' +
+    dateVN(t.date) + (txHasTime(t) ? ' ' + timeVN(txStamp(t)) : '');
   calcTxEdit();
   var d = $('#txDlg');
   if (d && d.showModal) d.showModal(); else if (d) d.setAttribute('open', '');
@@ -3176,29 +3270,29 @@ function saveTxEdit(){
   var p = findProduct(t.productId);
   var oldQty = num(t.qty);
   var oldCost = num(t.cost);
-  var delta = r2(q - oldQty);
+  var delta = dec(q - oldQty);
   if (p) {
     if (t.type === 'NHAP') {
       if (num(p.stock) + delta < -1e-9) {
         toast('Tồn "' + p.name + '" không đủ để giảm (còn ' + fmtQty(p.stock) + ')', 'error');
         return;
       }
-      p.stock = r2(num(p.stock) + delta);
-      if (price > 0) p.costPrice = r2(price);
+      p.stock = dec(num(p.stock) + delta);
+      if (price > 0) p.costPrice = dec(price);
     } else {
       if (num(p.stock) + 1e-9 < delta) {
         toast('Tồn "' + p.name + '" không đủ (còn ' + fmtQty(p.stock) + ')', 'error');
         return;
       }
-      p.stock = r2(num(p.stock) - delta);
+      p.stock = dec(num(p.stock) - delta);
     }
   }
-  t.qty = r2(q);
-  t.price = r2(price);
-  t.total = r2(q * price);
+  t.qty = dec(q);
+  t.price = dec(price);
+  t.total = dec(q * price);
   if (t.type === 'BAN') {
-    t.cost = p ? r2(q * num(p.costPrice))
-               : (oldQty > 0 ? r2(oldCost / oldQty * q) : oldCost);
+    t.cost = p ? dec(q * num(p.costPrice))
+               : (oldQty > 0 ? dec(oldCost / oldQty * q) : oldCost);
   }
   closeTxEdit();
   commit('Đã cập nhật giao dịch');
@@ -3367,6 +3461,7 @@ function restoreFromFile(file){
 
 /* ================= RENDER TỔNG ================= */
 function renderAll(){
+  indexTx();
   db.products.forEach(function(p){ p.name = capWords(p.name); });
   renderPresetOptions();
   renderInventory();
@@ -3455,10 +3550,9 @@ function handleAction(btn){
     case 'save-tx': saveTxEdit(); break;
     case 'save-edit': saveEdit(); break;
     case 'close-edit': closeEdit(); break;
-    case 'clear-imp': $('#impMonth').value = ''; impPage = 1; renderHistory('imp'); break;
-    case 'clear-exp': $('#expMonth').value = ''; expAll = true; expPage = 1; renderHistory('exp'); break;
-    case 'latest-imp': $('#impMonth').value = ''; impSel = ''; impPage = 1; renderHistory('imp'); break;
-    case 'del-imp-batch': delImpBatch(); break;
+    case 'clear-imp': setMonthInput('impMonth', ''); impAll = true; impPage = 1; renderHistory('imp'); break;
+    case 'clear-exp': setMonthInput('expMonth', ''); expAll = true; expPage = 1; renderHistory('exp'); break;
+    case 'latest-imp': setMonthInput('impMonth', ''); impAll = false; impPage = 1; renderHistory('imp'); break;
     case 'reconcile': openRec(); break;
     case 'merge-old': openMerge(); break;
     case 'close-merge': closeMerge(); break;
@@ -3466,7 +3560,7 @@ function handleAction(btn){
     case 'close-rec': closeRec(); break;
     case 'rec-fix': recFix(id); break;
     case 'rec-fix-all': recFixAll(); break;
-    case 'latest-exp': $('#expMonth').value = ''; expAll = false; expPage = 1; renderHistory('exp'); break;
+    case 'latest-exp': setMonthInput('expMonth', ''); expAll = false; expPage = 1; renderHistory('exp'); break;
     case 'mig-restore': restoreMigrate(); break;
     case 'backup-now': downloadBackup(true); break;
     case 'restore-file': {
@@ -3588,16 +3682,10 @@ function bindEvents(){
   var is = $('#invSearch');
   if (is) is.addEventListener('input', function(){ invPage = 1; renderInventory(); });
 
-  ['impMonth', 'expMonth'].forEach(function(id){
-    var n = $('#' + id);
-    if (n) n.addEventListener('change', function(){
-      if (id === 'impMonth') { impSel = ''; impPage = 1; renderHistory('imp'); }
-      else { expAll = false; expPage = 1; renderHistory('exp'); }
-    });
-  });
-
-  var ib = $('#impBatch');
-  if (ib) ib.addEventListener('change', function(){ impSel = ib.value; impPage = 1; renderImpNote(); });
+  bindDateInput('retailDate');
+  bindDateInput('remedyDate');
+  bindMonthInput('impMonth', function(){ impAll = false; impPage = 1; renderHistory('imp'); });
+  bindMonthInput('expMonth', function(){ expAll = false; expPage = 1; renderHistory('exp'); });
 
   var cy = $('#chartYear');
   if (cy) cy.addEventListener('change', function(){ chartSel = -1; renderChart(); });
@@ -3666,10 +3754,8 @@ function init(){
   applyTheme(m);
 
   var t = todayISO();
-  ['retailDate', 'remedyDate'].forEach(function(id){
-    var n = $('#' + id);
-    if (n) n.value = t;
-  });
+  setDateInput('retailDate', t);
+  setDateInput('remedyDate', t);
   var cy = $('#chartYear');
   if (cy) cy.value = thisYear();
 

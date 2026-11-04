@@ -5,6 +5,33 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.4.0] - 2026-11-04
+
+Bản cập nhật đồng bộ cách hiển thị lịch sử nhập hàng với lịch sử bán hàng, chuẩn hoá
+định dạng ngày kiểu Việt Nam và hiển thị số liệu chính xác, không làm tròn.
+
+### Thay đổi
+
+- **Lịch sử nhập hàng dạng bảng**: bỏ giao diện chọn "lần nhập" và tờ ghi riêng; lịch
+  sử nhập hàng giờ là bảng giống lịch sử bán hàng (*Ngày · Vị thuốc · SL · Đơn giá ·
+  Thành tiền · Thao tác*). Nút *Gần nhất* lọc theo ngày **và giờ:phút**, không chỉ ngày.
+- **Đơn nhập nhiều vị thuốc**: lần nhập có từ 2 vị trở lên hiện thành một dòng đơn có
+  tên *Đơn nhập ngày dd/mm/yyyy · HH:MM*; bấm vào tên để mở hộp chi tiết như đơn bán.
+  Lần nhập chỉ có 1 vị vẫn hiện thành dòng bình thường.
+- **Ngày kiểu Việt Nam**: mọi ô chọn ngày/tháng và mọi chỗ hiển thị ngày đều dùng
+  `dd/mm/yyyy` hoặc `mm/yyyy`; bấm biểu tượng lịch vẫn mở bộ chọn ngày gốc.
+- **Hiển thị số chính xác**: bỏ làm tròn 2 chữ số thập phân; số lượng, đơn giá và thành
+  tiền hiển thị đầy đủ chữ số (chỉ dọn nhiễu nhị phân của JavaScript), phân cách nghìn
+  bằng dấu `.` và phần thập phân bằng dấu `,`.
+- **Lưu thời điểm giao dịch**: mỗi giao dịch mới lưu thêm `ts` (miligiây); dữ liệu cũ
+  được suy ra thời điểm từ mã giao dịch để sắp xếp và lọc "Gần nhất" chính xác.
+
+### Sửa lỗi
+
+- Đơn nhập nhiều vị không còn bị tách rời trong lịch sử; xóa cả đơn sẽ điều chỉnh lại
+  tồn kho cho tất cả vị thuốc trong đơn.
+- Hộp chi tiết đơn nhập hiển thị đúng các cột *SL · Đơn giá · Thành tiền*.
+
 ## [1.3.0] - 2026-11-03
 
 Bản cập nhật bảo mật: ứng dụng yêu cầu đăng nhập bằng mật khẩu.
