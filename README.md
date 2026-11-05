@@ -15,10 +15,12 @@
 - **Dữ liệu**: 142 sản phẩm, 432 giao dịch, 6 đơn thuốc chén, 213 dòng prescription_items
 - **Chức năng**: Nhập hàng, bán lẻ, đơn thuốc chén, tồn kho, thống kê, backup/restore
 
-### 🌐 Demo
+### ⚠️ Mở rộng về an ninh
 
-- **Local development**: `http://localhost:8787` (chạy qua `npx wrangler dev`)
-- **Deployed**: https://quan-ly-kho.yellows-voz.workers.dev
+- Mỗi cài đặt có **Database D1 riêng** (`database_id = db9f5180-0f90-4f0e-bba9-2141f1c52fe6`)
+- Dữ liệu giữa các user **không bị mix lẫn nhau**
+- App **public** nghĩa là không có bước đăng nhập/run vào, không có xác thực mật khẩu
+- Để xem/app dụng, truy cập qua domain của bạn (`quan-ly-kho.yellows-voz.workers.dev` hoặc domain cá nhân)
 
 ---
 
