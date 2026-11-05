@@ -5,6 +5,16 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.11.0] - 2026-11-05
+
+### Thêm mới
+
+- **Danh sách tồn kho sắp xếp mặc định theo "Bán chạy nhất"**: tổng kg đã bán (mọi giao
+  dịch `BAN` — bán lẻ lẫn đơn chén, đều lưu `qty_kg`) giảm dần; hòa nhau → theo tên A→Z.
+  Lựa chọn mới nằm trên dropdown `#invSort`, các cách sắp xếp cũ giữ nguyên.
+  Chỉ đổi thứ tự hiển thị, không đụng dữ liệu.
+- Ý tưởng cảnh báo "tồn còn 10%" đã **bỏ** (chiều đo mơ hồ, dễ gây rối).
+
 ## [1.10.0] - 2026-11-05
 
 ### Thay đổi

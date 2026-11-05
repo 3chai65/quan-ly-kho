@@ -796,6 +796,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
           <div class="field">
             <label class="lbl" for="invSort">Sắp xếp</label>
             <select class="inp" id="invSort">
+              <option value="sold_desc" selected>Bán chạy nhất (nhiều → ít)</option>
               <option value="name_asc">Tên (A → Z)</option>
               <option value="stock_desc">Số lượng (nhiều → ít)</option>
               <option value="stock_asc">Số lượng (ít → nhiều)</option>
@@ -2259,11 +2260,21 @@ function renderInventory(){
   var tbody = $('#invBody');
   if (!tbody) return;
   tbody.textContent = '';
-  var sortBy = ($('#invSort') || {}).value || 'name_asc';
+  var sortBy = ($('#invSort') || {}).value || 'sold_desc';
   var kw = normSearch(($('#invSearch') || {}).value || '');
   var list = db.products.filter(function(p){ return !kw || normSearch(p.name).indexOf(kw) >= 0; });
 
+  // Tổng kg đã bán theo từng vị (BAN: bán lẻ + đơn chén, đều lưu qty_kg)
+  var sales = {};
+  db.transactions.forEach(function(t){
+    if (t && t.type === 'BAN') {
+      var pid = t.productId;
+      sales[pid] = (sales[pid] || 0) + num(t.qty);
+    }
+  });
+
   list.sort(function(a, b){
+    if (sortBy === 'sold_desc') return ((sales[b.id] || 0) - (sales[a.id] || 0)) || sortByName(a, b);
     if (sortBy === 'stock_desc') return num(b.stock) - num(a.stock);
     if (sortBy === 'stock_asc') return num(a.stock) - num(b.stock);
     if (sortBy === 'total_desc') return num(b.stock) * num(b.costPrice) - num(a.stock) * num(a.costPrice);
