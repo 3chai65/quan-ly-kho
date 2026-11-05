@@ -50,22 +50,27 @@ Không có `package.json`; không cần `npm install`.
    Client gửi header `X-Base-Updated: <updatedAt>`; server so với `app_meta.source_updated_at`,
    nếu bản trên server mới hơn → **409 conflict** (client hiện dialog "Lấy bản mới nhất" /
    "Giữ bản máy này", hoặc gửi `X-Force: 1` để ép ghi đè).
-5. **Có mã truy cập (token)**: mọi API `/api/*` cần header `Authorization: Bearer <APP_TOKEN>`;
-   trang HTML (`/`) mở được nhưng không chứa dữ liệu. Token lưu localStorage, nhập 1 lần
-   mỗi máy (xóa cache thì nhập lại). Secret đặt qua `npx wrangler secret put APP_TOKEN`
-   — không nằm trong git. Lộ/quên token → đặt secret mới + deploy lại; máy chủ so sánh
-   token sau khi `trim()` để tránh lệch ký tự xuống dòng.
+5. **Đăng nhập 1 người dùng**: mở `/` chưa đăng nhập → **trang login 1 ô mật khẩu**
+   (HTML thuần, không JS, không chứa dữ liệu). Đăng nhập đúng → cookie `qlk_token`
+   `HttpOnly; SameSite=Strict`, hết hạn sau 30 ngày, app dùng được đầy đủ.
+   API `/api/*` chấp nhận cookie (trình duyệt tự gửi) hoặc header `Authorization: Bearer <APP_TOKEN>`
+   (tương thích bản cũ). Secret đặt qua `npx wrangler secret put APP_TOKEN` — không nằm
+   trong git. Có nút **Đăng xuất** trên header. Lộ/quên mã → đặt secret mới + deploy lại,
+   mọi cookie cũ vô hiệu.
 
 ## API
 
-| Endpoint | Cần token? | Mô tả |
+| Endpoint | Cần đăng nhập? | Mô tả |
 |---|---|---|
-| `GET /` | Không (shell trống) | Trang app tĩnh, không có dữ liệu |
+| `GET /` | Có | Đã đăng nhập → app đầy đủ; chưa → trang login (1 ô mật khẩu, không chứa dữ liệu) |
+| `GET/POST /login` | Không | POST sai mã → 401; đúng → cookie 30 ngày + quay về `/` |
+| `GET /logout` | Không | Xóa cookie → về `/login` |
 | `GET /api/state` | **Có** | Lấy toàn bộ state (JSON) |
 | `PUT /api/state` | **Có** | Ghi snapshot (cần `X-Base-Updated`, xem mục 4) |
 | `/sync` | — | Cũ (KV), không dùng nữa |
 
-Token gửi qua header `Authorization: Bearer <APP_TOKEN>`.
+Xác thực qua cookie `qlk_token` (HttpOnly) hoặc header `Authorization: Bearer <APP_TOKEN>`.
+Trang HTML **không bao giờ** nhúng dữ liệu cho người chưa đăng nhập.
 
 ## Quy ước làm việc
 

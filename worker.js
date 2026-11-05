@@ -425,6 +425,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
           </button>
         </div>
       </div>
+      <a class="btn btn--sm" href="/logout">Đăng xuất</a>
     </div>
   </div>
 </header>
@@ -3534,36 +3535,21 @@ function saveTxEdit(){
   closeTxEdit();
   commit('Đã cập nhật giao dịch');
 }
-/* ==== Mã truy cập (1 người dùng) ==== */
-function getToken(){
-  var t = null;
-  try { t = localStorage.getItem('qlk_token'); } catch (e) {}
-  if (t) return t;
-  t = prompt('Nhập mã truy cập:');
-  if (t) {
-    t = String(t).trim();
-    if (t) { try { localStorage.setItem('qlk_token', t); } catch (e) {} return t; }
-  }
-  return null;
-}
+/* ==== Xác thực: cookie đăng nhập HttpOnly (hoặc Bearer nếu có localStorage) ==== */
 function authFetch(url, opts){
-  var t = getToken();
-  if (!t) return Promise.resolve(null);
   var o = {};
   var src = opts || {};
   for (var k in src) o[k] = src[k];
   var h = {};
   var sh = src.headers || {};
   for (var k2 in sh) h[k2] = sh[k2];
-  h['Authorization'] = 'Bearer ' + t;
+  var t = null;
+  try { t = localStorage.getItem('qlk_token'); } catch (e) {}
+  if (t) h['Authorization'] = 'Bearer ' + t;
   o.headers = h;
   o.cache = 'no-store';
   return fetch(url, o).then(function(r){
-    if (r.status === 401) {
-      try { localStorage.removeItem('qlk_token'); } catch (e) {}
-      alert('Mã truy cập sai hoặc đã bị xóa. Tải lại trang và nhập mã đúng.');
-      return null;
-    }
+    if (r.status === 401) { location.href = '/login'; return null; }
     return r;
   });
 }
@@ -4219,6 +4205,100 @@ function jsonRes(obj, status){
   });
 }
 
+function getCookie(request, name){
+  const raw = request.headers.get('Cookie') || '';
+  const parts = raw.split(';');
+  for (let i = 0; i < parts.length; i++) {
+    const idx = parts[i].indexOf('=');
+    if (idx === -1) continue;
+    if (parts[i].slice(0, idx).trim() !== name) continue;
+    const v = parts[i].slice(idx + 1).trim();
+    try { return decodeURIComponent(v); } catch (e) { return v; }
+  }
+  return '';
+}
+function validBearer(request, envToken){
+  const auth = String(request.headers.get('Authorization') || '').trim();
+  return auth !== '' && auth === 'Bearer ' + envToken;
+}
+function validCookie(request, envToken){
+  return String(getCookie(request, 'qlk_token')).trim() === envToken;
+}
+function redirectTo(path){
+  return new Response(null, { status: 303, headers: { 'Location': path, 'Cache-Control': 'no-store' } });
+}
+function logout(){
+  return new Response(null, { status: 303, headers: {
+    'Location': '/login',
+    'Set-Cookie': 'qlk_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0',
+    'Cache-Control': 'no-store'
+  } });
+}
+async function handleLogin(request, envToken){
+  let token = '';
+  try {
+    const text = (await request.text()).slice(0, 2048);
+    token = String(new URLSearchParams(text).get('token') || '').trim();
+  } catch (e) { token = ''; }
+  if (token !== '' && token === envToken) {
+    return new Response(null, { status: 303, headers: {
+      'Location': '/',
+      'Set-Cookie': 'qlk_token=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000; Secure',
+      'Cache-Control': 'no-store'
+    } });
+  }
+  await new Promise(r => setTimeout(r, 400));
+  return loginPage(true);
+}
+function loginPage(showError){
+  const err = showError ? '<p class="err" role="alert">Mã truy cập sai, thử lại.</p>' : '';
+  const html = `<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Quản Lý Kho — Đăng nhập</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: #0f1420; color: #e8ecf4;
+    font: 16px/1.5 "Segoe UI", system-ui, sans-serif; padding: 24px; }
+  .card { width: 100%; max-width: 380px; background: #171d2b; border: 1px solid #262f44;
+    border-radius: 18px; padding: 28px 26px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { margin: 0 0 18px; color: #9aa7bd; font-size: 13px; }
+  label { display: block; font-size: 12px; color: #9aa7bd; margin-bottom: 6px; }
+  input[type=password] { width: 100%; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid #2d3850; background: #10151f; color: inherit; font-size: 15px; }
+  input[type=password]:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+  button { margin-top: 14px; width: 100%; padding: 12px; border: 0; border-radius: 12px;
+    background: #3b82f6; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+  button:hover { background: #2563eb; }
+  .err { margin: 12px 0 0; color: #ff8d8d; font-size: 13px; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <h1>Quản Lý Kho</h1>
+    <p class="sub">Khu vực riêng tư — nhập mã truy cập để tiếp tục.</p>
+    <form method="POST" action="/login">
+      <label for="t">Mã truy cập</label>
+      <input id="t" name="token" type="password" autocomplete="current-password" autofocus required>
+      <button type="submit">Vào</button>
+    </form>
+    ${err}
+  </main>
+</body>
+</html>`;
+  return new Response(html, { status: showError ? 401 : 200, headers: {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Robots-Tag': 'noindex'
+  } });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -4229,23 +4309,28 @@ export default {
     if (method === 'OPTIONS') return new Response(null, { status: 204 });
 
     // ---------- Bảo vệ bằng mã truy cập (1 người dùng) ----------
-    // Trang HTML (/) và favicon/robots vẫn mở được; mọi API đều cần token.
-    const PUBLIC_PATHS = ['/', '/favicon.ico', '/robots.txt'];
-    if (method !== 'OPTIONS' && PUBLIC_PATHS.indexOf(url.pathname) === -1) {
-      if (!env.APP_TOKEN) {
-        if (url.pathname.indexOf('/api/') === 0) {
-          return jsonRes({ success: false, error: 'Server chưa cấu hình APP_TOKEN' }, 500);
-        }
-        return new Response('Server chưa cấu hình APP_TOKEN', { status: 500 });
+    // / và mọi API đều cần đăng nhập (cookie qlk_token) hoặc Bearer token.
+    // Chưa đăng nhập: / → trang login (không chứa dữ liệu); /api/* → 401.
+    const envToken = env.APP_TOKEN ? String(env.APP_TOKEN).trim() : '';
+    const authed = !!envToken && (validBearer(request, envToken) || validCookie(request, envToken));
+    const PUBLIC_PATHS = ['/favicon.ico', '/robots.txt'];
+
+    if (url.pathname === '/logout') return logout();
+    if (url.pathname === '/login') {
+      if (!envToken) return new Response('Server chua cau hinh APP_TOKEN', { status: 500 });
+      if (method === 'POST') return handleLogin(request, envToken);
+      if (method === 'GET') return authed ? redirectTo('/') : loginPage(false);
+      return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, POST' } });
+    }
+
+    if (PUBLIC_PATHS.indexOf(url.pathname) === -1 && !authed) {
+      if (url.pathname.indexOf('/api/') === 0) {
+        if (!envToken) return jsonRes({ success: false, error: 'Server chưa cấu hình APP_TOKEN' }, 500);
+        return jsonRes({ success: false, error: 'Unauthorized' }, 401);
       }
-      const envToken = String(env.APP_TOKEN).trim();
-      const auth = String(request.headers.get('Authorization') || '').trim();
-      if (auth !== 'Bearer ' + envToken) {
-        if (url.pathname.indexOf('/api/') === 0) {
-          return jsonRes({ success: false, error: 'Unauthorized' }, 401);
-        }
-        return new Response('Unauthorized', { status: 401 });
-      }
+      if (!envToken) return new Response('Server chua cau hinh APP_TOKEN', { status: 500 });
+      if (url.pathname === '/') return loginPage(false);
+      return new Response('Unauthorized', { status: 401 });
     }
 
     if (url.pathname === '/favicon.ico') {

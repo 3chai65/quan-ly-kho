@@ -5,6 +5,26 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.9.0] - 2026-11-05
+
+### Bảo mật
+
+- **Trang login 1 ô mật khẩu**: `/` chưa đăng nhập chỉ trả về trang login (~2 KB, HTML thuần,
+  không JS, **không chứa bất kỳ dữ liệu nào**). Trước bản này, toàn bộ dữ liệu (sản phẩm,
+  tồn, giá vốn, giao dịch) bị nhúng thẳng trong HTML qua `window.__DB__` — ai mở `/` cũng
+  đọc được toàn bộ, token API không chặn được việc này.
+- Đăng nhập đúng → cookie `qlk_token` (`HttpOnly; SameSite=Strict; Max-Age=30 ngày`), app
+  dùng đầy đủ như trước, không cần nhập lại cho tới khi hết hạn/xóa cookie.
+- API `/api/*` chấp nhận cookie (trình duyệt tự gửi) hoặc `Authorization: Bearer <APP_TOKEN>`
+  (tương thích bản 1.8.0). Sai mã → 401 + trễ 400ms.
+- Nút **Đăng xuất** trên header (`GET /logout` xóa cookie → về `/login`).
+- Worker so sánh mã sau khi `trim()` ở cả Bearer lẫn cookie.
+
+### Sửa lỗi
+
+- Một số trình duyệt/máy yếu không render được vùng app → thấy trang trắng. Trang login
+  mới không dùng JS nên hiển thị được trên mọi trình duyệt; app được phục vụ như cũ sau khi đăng nhập.
+
 ## [1.8.0] - 2026-11-05
 
 ### Thêm mới
