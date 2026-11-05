@@ -52,18 +52,19 @@ Không có `package.json`; không cần `npm install`.
    "Giữ bản máy này", hoặc gửi `X-Force: 1` để ép ghi đè).
 5. **Đăng nhập 1 người dùng**: mở `/` chưa đăng nhập → **trang login 1 ô mật khẩu**
    (HTML thuần, không JS, không chứa dữ liệu). Đăng nhập đúng → cookie `qlk_token`
-   `HttpOnly; SameSite=Strict`, hết hạn sau 30 ngày, app dùng được đầy đủ.
-   API `/api/*` chấp nhận cookie (trình duyệt tự gửi) hoặc header `Authorization: Bearer <APP_TOKEN>`
-   (tương thích bản cũ). Secret đặt qua `npx wrangler secret put APP_TOKEN` — không nằm
-   trong git. Có nút **Đăng xuất** trên header. Lộ/quên mã → đặt secret mới + deploy lại,
-   mọi cookie cũ vô hiệu.
+   `HttpOnly; SameSite=Strict` — **không tự hết hạn**, chỉ kết thúc khi bấm **Đăng xuất**
+   (cookie sống tối đa ~10 năm). Nhập sai quá **10 lần trong 10 phút** → tạm khóa
+   đăng nhập ~10 phút (đếm theo IP qua KV). API `/api/*` chấp nhận cookie (trình duyệt
+   tự gửi) hoặc header `Authorization: Bearer <APP_TOKEN>` (tương thích bản cũ).
+   Secret đặt qua `npx wrangler secret put APP_TOKEN` — không nằm trong git.
+   Đổi mã → đặt secret mới + deploy lại, mọi cookie cũ vô hiệu.
 
 ## API
 
 | Endpoint | Cần đăng nhập? | Mô tả |
 |---|---|---|
 | `GET /` | Có | Đã đăng nhập → app đầy đủ; chưa → trang login (1 ô mật khẩu, không chứa dữ liệu) |
-| `GET/POST /login` | Không | POST sai mã → 401; đúng → cookie 30 ngày + quay về `/` |
+| `GET/POST /login` | Không | POST sai mã → 401; đúng → cookie (không tự hết hạn) + quay về `/`; sai >10 lần/10 phút → 429 tạm khóa |
 | `GET /logout` | Không | Xóa cookie → về `/login` |
 | `GET /api/state` | **Có** | Lấy toàn bộ state (JSON) |
 | `PUT /api/state` | **Có** | Ghi snapshot (cần `X-Base-Updated`, xem mục 4) |

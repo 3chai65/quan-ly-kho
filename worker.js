@@ -4234,24 +4234,59 @@ function logout(){
     'Cache-Control': 'no-store'
   } });
 }
-async function handleLogin(request, envToken){
+function clientIp(request){
+  return String(request.headers.get('CF-Connecting-IP') || 'unknown').trim();
+}
+async function loginFails(env, ip){
+  try {
+    if (!env || !env.KV) return 0;
+    const raw = await env.KV.get('login_fail:' + ip);
+    const n = parseInt(raw || '0', 10);
+    return Number.isFinite(n) ? n : 0;
+  } catch (e) { return 0; }
+}
+async function addLoginFail(env, ip){
+  try {
+    if (!env || !env.KV) return;
+    const n = (await loginFails(env, ip)) + 1;
+    await env.KV.put('login_fail:' + ip, String(n), { expirationTtl: 600 });
+  } catch (e) {}
+}
+async function clearLoginFails(env, ip){
+  try { if (env && env.KV) await env.KV.delete('login_fail:' + ip); } catch (e) {}
+}
+async function handleLogin(request, envToken, env){
+  const ip = clientIp(request);
+  if ((await loginFails(env, ip)) >= 10) {
+    return loginPage('locked');
+  }
   let token = '';
   try {
     const text = (await request.text()).slice(0, 2048);
     token = String(new URLSearchParams(text).get('token') || '').trim();
   } catch (e) { token = ''; }
   if (token !== '' && token === envToken) {
+    await clearLoginFails(env, ip);
     return new Response(null, { status: 303, headers: {
       'Location': '/',
-      'Set-Cookie': 'qlk_token=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000; Secure',
+      'Set-Cookie': 'qlk_token=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=315360000; Secure',
       'Cache-Control': 'no-store'
     } });
   }
-  await new Promise(r => setTimeout(r, 400));
-  return loginPage(true);
+  await addLoginFail(env, ip);
+  await new Promise(r => setTimeout(r, 800));
+  return loginPage('wrong');
 }
-function loginPage(showError){
-  const err = showError ? '<p class="err" role="alert">Mã truy cập sai, thử lại.</p>' : '';
+function loginPage(kind){
+  let err = '';
+  let status = 200;
+  if (kind === 'locked') {
+    err = '<p class="err" role="alert">Quá nhiều lần nhập sai. Vui lòng đợi ~10 phút rồi thử lại.</p>';
+    status = 429;
+  } else if (kind === 'wrong' || kind === true) {
+    err = '<p class="err" role="alert">Mã truy cập sai, thử lại.</p>';
+    status = 401;
+  }
   const html = `<!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -4292,7 +4327,7 @@ function loginPage(showError){
   </main>
 </body>
 </html>`;
-  return new Response(html, { status: showError ? 401 : 200, headers: {
+  return new Response(html, { status: status, headers: {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Robots-Tag': 'noindex'
@@ -4318,7 +4353,7 @@ export default {
     if (url.pathname === '/logout') return logout();
     if (url.pathname === '/login') {
       if (!envToken) return new Response('Server chua cau hinh APP_TOKEN', { status: 500 });
-      if (method === 'POST') return handleLogin(request, envToken);
+      if (method === 'POST') return handleLogin(request, envToken, env);
       if (method === 'GET') return authed ? redirectTo('/') : loginPage(false);
       return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, POST' } });
     }

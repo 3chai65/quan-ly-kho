@@ -5,6 +5,19 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.10.0] - 2026-11-05
+
+### Thay đổi
+
+- **Phiên đăng nhập không tự hết hạn**: cookie `qlk_token` sống ~10 năm, chỉ kết thúc khi
+  bấm **Đăng xuất** (xóa cookie tại `/logout`). Không còn giới hạn 30 ngày.
+- **Chống dò mật khẩu**: nhập sai quá **10 lần trong 10 phút** (đếm theo IP, lưu trong
+  KV, TTL 10 phút) → tạm khóa đăng nhập, trả 429. Đăng nhập đúng → bộ đếm được xóa.
+  Cần thiết vì mã truy cập là mật khẩu ngắn.
+- Độ trễ sau mỗi lần nhập sai tăng lên 800ms (trước là 400ms).
+- Mã truy cập hiện tại đặt qua `wrangler secret put APP_TOKEN` (nêu rõ nếu đổi mã thì mọi
+  cookie/Bearer cũ vô hiệu).
+
 ## [1.9.0] - 2026-11-05
 
 ### Bảo mật
