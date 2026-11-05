@@ -25,6 +25,7 @@ const sqlNumber = (value, fallback = 0) => {
   return Number.isFinite(n) ? String(n) : String(fallback);
 };
 const sqlNullableNumber = value => {
+  if (value == null || value === '') return 'NULL';
   const n = Number(value);
   return Number.isFinite(n) ? String(n) : 'NULL';
 };

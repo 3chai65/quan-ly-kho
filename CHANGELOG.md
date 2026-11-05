@@ -5,6 +5,58 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.14.1] - 2026-11-05
+
+### Refactor
+
+- Tách khối `PAGE` (~3.978 dòng: HTML + CSS + toàn bộ JS client) từ `worker.js` sang
+  `src/page.js` dưới dạng `export const PAGE = String.raw\`...\``. `worker.js` còn ~530 dòng,
+  chỉ giữ router/API, xác thực, đồng bộ D1 và lắp trang.
+- `worker.js` import `PAGE` từ `src/page.js`; Wrangler tự bundle ESM nên **không phát sinh
+  bước build mới**, không cần `package.json`/`npm install`.
+- Giữ nguyên 100% nội dung HTML/CSS/JS client, placeholder `%%NONCE%%` / `%%BOOT%%` /
+  `%%NEEDFETCH%%`, SSR và CSP.
+- Test đọc `PAGE` từ `src/page.js`; thêm test xác nhận placeholder và việc `GET /` lắp trang,
+  thay nonce/SSR đúng. Tổng test: **18 pass**.
+
+## [1.14.0] - 2026-11-05
+
+### Sửa lỗi dữ liệu (P0)
+
+- **Xóa đơn nhập không còn làm tồn âm**: `delTx()` / `delOrder()` kiểm tra hàng đã bán trước
+  khi trừ tồn; màn **Đối chiếu tồn kho** từ chối áp dụng số âm và bỏ qua các dòng lịch sử âm.
+- **Sửa giao dịch bán giữ nguyên giá vốn lịch sử** (dùng đơn giá vốn cũ của chính giao dịch,
+  chỉ fallback giá hiện tại khi thiếu `cost`) và **cập nhật lại `unitPrice`** cho mọi dòng
+  cùng đơn thuốc để `Số thang × Giá 1 thang = Thành tiền` luôn đúng.
+- **Chặn tiền/số lượng âm** ở bán lẻ, ghi chú bán lẻ, nhập hàng, sửa giá nhập và sửa giao dịch.
+- **Mọi giao dịch bán lẻ đều có cờ `retail`** (kể cả đơn 1 vị); `mergeCandidates()` loại cả
+  `retail` và tên cũ "Bán lẻ" nên không gộp nhầm đơn bán lẻ.
+- **Lưu đơn thuốc theo ID đang chọn**, không dò theo tên: đổi tên không ghi đè đơn khác;
+  trùng tên bị chặn; đổi tên có xác nhận (đổi tên hay lưu thành đơn mới).
+- **Restore an toàn hơn**: file phải đủ `products` / `transactions` / `prescriptions`, kiểm tra
+  ngày và số liệu; restore luôn **ép ghi đè Cloud** thay vì có thể mất bản vừa khôi phục.
+- **Chia tiền đơn thuốc theo gram**: dòng cuối nhận phần dư để tổng khớp tuyệt đối; giá 1 thang
+  được đọc sau khi thêm dòng đang nhập (không còn dùng giá trị cũ).
+
+### Đồng bộ & API
+
+- Thay so sánh `Date.now()` của client với timestamp server bằng **cờ `dirty` + `cloudBase`**
+  lưu trong localStorage; thay đổi chưa gửi được giữ khi tải lại và tự đẩy lên Cloud.
+  Khi không lưu được (mất mạng/400), app báo một lần "dữ liệu vẫn giữ trên máy này".
+- Chống mất thay đổi khi có thao tác mới trong lúc request `PUT` đang chạy (giữ `dirty`, gửi tiếp).
+- `readState()` đọc giao dịch và dòng đơn theo **`rowid`** để giữ đúng thứ tự dòng sau khi tải lại.
+- Server **validate snapshot trước khi ghi**: đủ 3 bảng, tồn/tiền/qty không âm, ngày
+  `YYYY-MM-DD`, số thang/gram hợp lệ; tự loại bản ghi trùng id/tên và trả `400` kèm chi tiết.
+- Client `sanitize()` cũng loại trùng id/tên để lần lưu sau không làm hỏng `db.batch()`.
+
+### Công cụ & tài liệu
+
+- `scripts/backup-to-sql.mjs`: `cost: null` giữ `NULL` thay vì ghi thành `0`.
+- Thêm `tests/worker.test.mjs` (Node built-in test runner) cho tiền, chuẩn hoá, đối chiếu tồn,
+  gộp đơn, restore, validate API, conflict và script backup.
+- README cập nhật quy ước tiền (nghìn VND), hiển thị đúng giá trị, dirty/cloudBase, restore ép
+  ghi đè và mục tiêu Lighthouse (SEO cố ý `noindex`).
+
 ## [1.13.1] - 2026-11-05
 
 ### Docs
