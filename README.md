@@ -51,15 +51,53 @@ node --test "tests/**/*.test.mjs"   # chạy test trước khi deploy
 Không có `package.json`; không cần `npm install`. `worker.js` import `src/page.js` — Wrangler
 tự bundle các module ESM khi `dev`/`deploy`, không cần bước build riêng.
 
-## Backup — BẮT BUỘC làm thường xuyên
+## Backup & khôi phục — BẮT BUỘC làm thường xuyên
 
-- Trong app: **Settings → Tải file sao lưu** (JSON).
+- Trong app: **Sao lưu & khôi phục → Tải file sao lưu** (JSON). App cũng tự nhắc/tải 1 lần/ngày khi mở.
+- Trước khi **khôi phục**, app tự tải thêm một bản `kho-backup-truoc-restore-YYYY-MM-DD-HHmm.json`
+  (snapshot ngay trước khi ghi đè). Nếu trình duyệt chặn tải file, app **dừng restore** thay vì ghi đè mù.
 - File khôi phục phải có đủ **3 bảng** `products` / `transactions` / `prescriptions`; app
   kiểm tra ngày, số lượng và tiền trước khi nhận.
 - Restore / PUT `/api/state` = **xóa sạch toàn bộ bảng rồi ghi lại snapshot** → ghi đè mất
   dữ liệu nếu file sai. Restore trong app là thao tác **chủ động ghi đè**: luôn ép ghi lên
   Cloud (`X-Force: 1`), không hỏi conflict.
-- Luôn giữ file `kho-backup-YYYY-MM-DD.json` ở nơi an toàn (ngoài git).
+- Luôn giữ file `kho-backup-*.json` ở nơi an toàn (ngoài git).
+
+### Khôi phục toàn bộ D1 bằng Time Travel
+
+Time Travel luôn bật và **không tốn phí**; khôi phục tới bất kỳ phút nào trong
+**7 ngày (Free)** hoặc **30 ngày (Paid)**. Thao tác restore **ghi đè toàn bộ DB tại chỗ**
+và huỷ query đang chạy, nên luôn lưu bookmark trước khi migrate/sửa tay/khôi phục.
+
+```bash
+# Kiểm tra DB có hỗ trợ Time Travel (cần version: production)
+npx wrangler d1 info quan-ly-kho
+
+# Lấy bookmark hiện tại (lưu lại trước thao tác rủi ro)
+npx wrangler d1 time-travel info quan-ly-kho
+
+# Lấy bookmark tại một thời điểm
+npx wrangler d1 time-travel info quan-ly-kho --timestamp="2026-11-05T10:00:00+07:00"
+
+# Khôi phục DB về bookmark / mốc thời gian
+npx wrangler d1 time-travel restore quan-ly-kho --bookmark=<bookmark>
+npx wrangler d1 time-travel restore quan-ly-kho --timestamp=<unix-seconds>
+```
+
+Sau khi restore, Wrangler in ra **bookmark trước đó**; giữ lại để undo nếu restore nhầm.
+Time Travel chưa hỗ trợ clone/fork, nên không dùng để copy sang DB mới — chỉ dùng để khôi phục.
+
+### Backup lâu hơn 30 ngày
+
+Time Travel chỉ giữ 7/30 ngày. Muốn lâu hơn, xuất SQL định kỳ (chạy ngoài giờ bán hàng vì
+export đang chạy sẽ chặn request khác):
+
+```bash
+npx wrangler d1 export quan-ly-kho --remote --output=backup-$(date +%F).sql
+```
+
+Có thể thêm job GitHub Actions cuối tuần chạy lệnh này và upload `.sql` làm artifact
+(giữ 90 ngày). Không cần Worker cron hay R2 cho nhu cầu 1 người.
 
 ## Logic cốt lõi — KHÔNG được phá vỡ khi sửa
 
@@ -78,7 +116,8 @@ tự bundle các module ESM khi `dev`/`deploy`, không cần bước build riên
    Client lưu thêm cờ `dirty` + mốc `cloudBase` trong localStorage: thay đổi chưa gửi được
    giữ lại khi tải lại trang và tự đẩy lên server; không còn so sánh đồng hồ máy với server.
    Server kiểm tra snapshot trước khi ghi (tồn/tiền không âm, ngày `YYYY-MM-DD`, đủ 3 bảng,
-   không trùng khoá) và trả **400** kèm chi tiết thay vì làm hỏng cả batch.
+   không trùng khoá) và trả **400** kèm chi tiết; JSON hỏng cũng trả **400**. Server **cảnh báo**
+   (không chặn) khi giao dịch/dòng đơn trỏ tới `productId` không có trong `products`.
 5. **Đăng nhập 1 người dùng**: mở `/` chưa đăng nhập → **trang login 1 ô mật khẩu**
    (HTML thuần, không JS, không chứa dữ liệu). Đăng nhập đúng → cookie `qlk_token`
    `HttpOnly; SameSite=Strict` — **không tự hết hạn**, chỉ kết thúc khi bấm **Đăng xuất**

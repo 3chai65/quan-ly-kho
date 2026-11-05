@@ -5,6 +5,30 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.14.2] - 2026-11-05
+
+### Khôi phục & an toàn dữ liệu
+
+- **Backup trước khi restore**: app tự tải `kho-backup-truoc-restore-YYYY-MM-DD-HHmm.json`
+  (snapshot ngay trước khi ghi đè). Nếu trình duyệt chặn tải, restore bị huỷ thay vì mù quáng.
+- README bổ sung runbook **D1 Time Travel** (kiểm tra `version: production`, lấy bookmark hiện
+  tại/theo timestamp, khôi phục ghi đè, undo bằng bookmark trước đó) và hướng dẫn `d1 export`
+  cho backup dài hạn.
+
+### Sửa lỗi server & validate
+
+- `PUT /api/state` với **JSON hỏng trả 400** (`JSON không hợp lệ`) thay vì 500.
+- Server **cảnh báo** (không chặn) khi `transactions.productId` hoặc `prescription_items.productId`
+  trỏ tới sản phẩm không có trong `products`; tổng số warning bị giới hạn 50 dòng.
+
+### Refactor & test
+
+- Tách `computeStats()` và `allocateRemedyAmounts()` thành hàm thuần, dùng chung cho UI và test.
+  Tổng dòng khi chia tiền đơn thuốc vẫn bằng đúng `grand`; dòng cuối nhận phần dư.
+- Test tăng từ 18 lên **27 pass**: stats/lãi ngày-tháng-năm, chia tiền lẻ, backup trước restore,
+  luồng 409 (Lấy bản mới / Giữ bản máy này + `X-Force`), `pullState` khi dirty,
+  JSON hỏng → 400, cảnh báo `productId` mồ côi.
+
 ## [1.14.1] - 2026-11-05
 
 ### Refactor

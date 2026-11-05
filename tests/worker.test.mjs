@@ -32,7 +32,7 @@ function makeEl() {
   };
 }
 
-function loadClient() {
+function loadClient(extra = {}) {
   const blocks = [...PAGE.matchAll(/<script nonce="%%NONCE%%">([\s\S]*?)<\/script>/g)]
     .map(m => m[1]);
   const code = blocks.find(b => b.includes('var doc = document;'));
@@ -55,7 +55,12 @@ globalThis.__test = {
   isDirty: function(){ return dirty; },
   setBase: function(v){ cloudBase = dec(v); },
   getBase: function(){ return cloudBase; },
-  saveLocal: saveLocal, readDirty: readDirty, readBase: readBase
+  saveLocal: saveLocal, readDirty: readDirty, readBase: readBase,
+  computeStats: computeStats, allocateRemedyAmounts: allocateRemedyAmounts,
+  backupBeforeRestore: backupBeforeRestore, downloadBackup: downloadBackup,
+  pushState: pushState, pullState: pullState, cloudConflict: cloudConflict,
+  setConflictOpen: function(v){ conflictOpen = !!v; },
+  setSyncErrorShown: function(v){ syncErrorShown = !!v; }
 };
 })();`;
   const store = new Map();
@@ -89,7 +94,8 @@ globalThis.__test = {
     getComputedStyle() { return { getPropertyValue() { return ''; } }; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
     Blob: class {}, FileReader: class {}, MouseEvent: class {},
-    matchMedia: () => ({ matches: false, addEventListener() {} })
+    matchMedia: () => ({ matches: false, addEventListener() {} }),
+    ...extra
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
@@ -189,6 +195,37 @@ test('txCogs dùng giá vốn đã lưu, fallback giá hiện tại khi thiếu'
   assert.equal(app.txCogs({ productId: 'x', qty: 2 }), 0);
 });
 
+test('computeStats tính đúng doanh thu và lãi ngày/tháng/năm', () => {
+  const products = [
+    { id: 'p1', name: 'A', stock: 10, costPrice: 100 },
+    { id: 'p2', name: 'B', stock: 2, costPrice: 50 }
+  ];
+  const txs = [
+    { id: 't1', date: '2026-03-15', type: 'BAN', productId: 'p1', qty: 2, total: 1000, cost: 300 },
+    { id: 't2', date: '2026-03-02', type: 'BAN', productId: 'p2', qty: 1, total: 200 },
+    { id: 't3', date: '2026-03-01', type: 'NHAP', productId: 'p1', qty: 5, total: 500 },
+    { id: 't4', date: '2025-12-31', type: 'BAN', productId: 'p1', qty: 1, total: 100, cost: 40 },
+    { id: 't5', date: '2026-03-15', type: 'BAN', productId: 'x', qty: 1, total: 50 }
+  ];
+  const s = app.computeStats(txs, products, '2026-03-15');
+  assert.equal(s.dExp, 1050);      // t1 + t5
+  assert.equal(s.dCogs, 300);      // t5 không có giá vốn và không có sản phẩm → 0
+  assert.equal(s.mImp, 500);       // chỉ NHAP trong tháng
+  assert.equal(s.mExp, 1250);
+  assert.equal(s.mCogs, 350);      // 300 + 50 (fallback p2) + 0
+  assert.equal(s.yExp, 1250);
+  assert.equal(s.profitDay, 750);
+  assert.equal(s.profitMonth, 900);
+  assert.equal(s.stock, 12);
+
+  const loss = app.computeStats(
+    [{ date: '2026-03-15', type: 'BAN', productId: 'p1', qty: 1, total: 10, cost: 20 }],
+    products, '2026-03-15'
+  );
+  assert.equal(loss.profitDay, -10);
+  assert.equal(loss.profitMonth, -10);
+});
+
 test('reconcileList tính đúng chênh lệch và phát hiện tồn lịch sử âm', () => {
   app.setDb({
     products: [
@@ -238,6 +275,21 @@ test('mergeCandidates vẫn gộp các dòng bán rời không có cờ retail',
   assert.equal(list[0].items.length, 2);
 });
 
+test('allocateRemedyAmounts chia đủ tiền và dòng cuối nhận phần dư', () => {
+  const three = app.allocateRemedyAmounts(100, [{ g: 1 }, { g: 1 }, { g: 1 }]);
+  assert.equal(three.length, 3);
+  assert.equal(app.dec(three.reduce((a, b) => a + b, 0)), 100);
+
+  const uneven = app.allocateRemedyAmounts(800, [{ g: 3 }, { g: 5 }]);
+  assert.deepEqual(uneven, [300, 500]);
+
+  const odd = app.allocateRemedyAmounts(100.001, [{ g: 3 }, { g: 5 }, { g: 7 }, { g: 11 }]);
+  assert.equal(app.dec(odd.reduce((a, b) => a + b, 0)), 100.001);
+
+  assert.deepEqual(app.allocateRemedyAmounts(42.5, [{ g: 10 }]), [42.5]);
+  assert.equal(app.dec(app.allocateRemedyAmounts(100, [{ g: 0 }, { g: 0 }]).reduce((a, b) => a + b, 0)), 100);
+});
+
 /* ------------------------------------------------------------------ */
 /* Trạng thái đồng bộ local                                            */
 /* ------------------------------------------------------------------ */
@@ -253,6 +305,109 @@ test('saveLocal lưu đúng cờ dirty và mốc cloud base', () => {
   app.setDirty(true);
   app.saveLocal();
   assert.equal(app.readDirty(), true);
+});
+
+test('backupBeforeRestore lưu snapshot hiện tại với tên riêng', () => {
+  let blobText = '';
+  let downloadName = '';
+  class CaptureBlob { constructor(parts){ blobText = String(parts[0]); } }
+  const document = {
+    readyState: 'loading',
+    documentElement: makeEl(),
+    body: makeEl(),
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    createElement() {
+      const e = makeEl();
+      e.click = function () { downloadName = this.download; };
+      return e;
+    },
+    addEventListener() {}, removeEventListener() {}
+  };
+  const client = loadClient({ Blob: CaptureBlob, document });
+  client.setDb({
+    products: [{ id: 'p1', name: 'A', stock: 1, costPrice: 2 }],
+    transactions: [], prescriptions: [], updatedAt: 7
+  });
+  assert.equal(client.backupBeforeRestore(), true);
+  assert.match(downloadName, /^kho-backup-truoc-restore-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
+  const payload = JSON.parse(blobText);
+  assert.equal(payload.data.products[0].name, 'A');
+  assert.equal(payload.data.updatedAt, 7);
+});
+
+test('backupBeforeRestore trả false khi trình duyệt chặn tạo file', () => {
+  class BlockedBlob { constructor(){ throw new Error('blocked'); } }
+  const client = loadClient({ Blob: BlockedBlob });
+  client.setDb({ products: [], transactions: [], prescriptions: [], updatedAt: 0 });
+  assert.equal(client.backupBeforeRestore(), false);
+});
+
+test('pushState khi 409: chọn Lấy bản mới thì tải remote, không ép ghi đè', async () => {
+  const calls = [];
+  const remote = { products: [{ id: 'p1', name: 'Remote', stock: 2, costPrice: 2 }], transactions: [], prescriptions: [], updatedAt: 20 };
+  const fetchStub = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    calls.push({ method, headers: opts.headers || {} });
+    if (method === 'PUT') {
+      return { status: 200, json: async () => ({ success: false, conflict: true, updatedAt: 20 }) };
+    }
+    return { status: 200, json: async () => ({ success: true, data: remote }) };
+  };
+  const client = loadClient({ fetch: fetchStub, confirm: () => true });
+  client.setDb({ products: [{ id: 'p1', name: 'Local', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 10 });
+  client.setBase(10);
+  client.setDirty(true);
+  await client.pushState(true, false);
+  assert.equal(client.getDb().products[0].name, 'Remote');
+  assert.equal(client.isDirty(), false);
+  assert.equal(calls.filter(c => c.method === 'PUT').length, 1);
+  assert.ok(!calls.some(c => c.headers['X-Force']));
+});
+
+test('pushState khi 409: chọn giữ bản máy này thì ghi đè bằng X-Force', async () => {
+  const calls = [];
+  const fetchStub = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    calls.push({ method, headers: opts.headers || {} });
+    if (method === 'PUT') {
+      if (opts.headers && opts.headers['X-Force'] === '1')
+        return { status: 200, json: async () => ({ success: true, updatedAt: 30 }) };
+      return { status: 200, json: async () => ({ success: false, conflict: true, updatedAt: 20 }) };
+    }
+    throw new Error('không được gọi GET trong trường hợp này');
+  };
+  const client = loadClient({ fetch: fetchStub, confirm: () => false });
+  client.setDb({ products: [{ id: 'p1', name: 'Local', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 10 });
+  client.setBase(10);
+  client.setDirty(true);
+  const ok = await client.pushState(true, false);
+  assert.equal(ok, true);
+  const puts = calls.filter(c => c.method === 'PUT');
+  assert.equal(puts.length, 2);
+  assert.equal(puts[1].headers['X-Force'], '1');
+  assert.equal(client.getDb().products[0].name, 'Local');
+  assert.equal(client.isDirty(), false);
+  assert.equal(client.getBase(), 30);
+});
+
+test('pullState khi dirty không ghi đè local, đẩy bản local lên', async () => {
+  const calls = [];
+  const remote = { products: [{ id: 'p1', name: 'Remote', stock: 2, costPrice: 2 }], transactions: [], prescriptions: [], updatedAt: 20 };
+  const fetchStub = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    calls.push(method);
+    if (method === 'PUT')
+      return { status: 200, json: async () => ({ success: true, updatedAt: 40 }) };
+    return { status: 200, json: async () => ({ success: true, data: remote }) };
+  };
+  const client = loadClient({ fetch: fetchStub });
+  client.setDb({ products: [{ id: 'p1', name: 'Local', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 10 });
+  client.setBase(10);
+  client.setDirty(true);
+  await client.pullState(true, false);
+  assert.equal(client.getDb().products[0].name, 'Local');
+  assert.deepEqual(calls, ['GET', 'PUT']);
 });
 
 /* ------------------------------------------------------------------ */
@@ -366,6 +521,33 @@ test('PUT /api/state trả 409 khi thiết bị khác đã ghi (không có X-For
   const body = await res.json();
   assert.equal(body.conflict, true);
   assert.equal(d1.writes.length, 0);
+});
+
+test('PUT /api/state trả 400 khi JSON hỏng', async () => {
+  const req = new Request('https://kho.test/api/state', {
+    method: 'PUT',
+    headers: { Authorization: 'Bearer test-token', 'Content-Type': 'application/json' },
+    body: '{"products":'
+  });
+  const res = await worker.fetch(req, { APP_TOKEN: 'test-token', DB: fakeD1() });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.success, false);
+  assert.match(body.error, /JSON/);
+});
+
+test('PUT /api/state cảnh báo productId không tồn tại nhưng vẫn ghi', async () => {
+  const d1 = fakeD1();
+  const state = structuredClone(emptyState);
+  state.products.push({ id: 'p1', name: 'A', stock: 1, costPrice: 0 });
+  state.transactions.push({ id: 't1', date: '2026-01-01', type: 'BAN', productId: 'ghost', qty: 1, price: 1, total: 1 });
+  state.prescriptions.push({ id: 'r1', name: 'Đơn', items: [{ productId: 'ghost2', grams: 1 }], total: 1, thang: 1 });
+  const res = await worker.fetch(put(state), { APP_TOKEN: 'test-token', DB: d1 });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.ok(body.warnings.some(w => w.includes('ghost')));
+  assert.ok(body.warnings.some(w => w.includes('ghost2')));
 });
 
 test('PUT /api/state cho phép ghi đè khi có X-Force', async () => {

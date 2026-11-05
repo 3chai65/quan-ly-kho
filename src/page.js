@@ -1772,6 +1772,20 @@ function remedyThang(){
 function remedyGrand(){
   return dec(remedyThang() * num(($('#remedyUnitPrice') || {}).value));
 }
+/* Hàm thuần: chia grand cho các dòng theo gram; dòng cuối nhận phần dư
+   để tổng các dòng luôn bằng đúng grand. */
+function allocateRemedyAmounts(grand, items){
+  var list = items || [];
+  var totalG = list.reduce(function(a, it){ return a + num(it.g); }, 0);
+  var allocated = 0;
+  return list.map(function(it, idx){
+    var amount = idx === list.length - 1
+      ? dec(grand - allocated)
+      : dec(totalG > 0 ? grand * (num(it.g) / totalG) : 0);
+    allocated = dec(allocated + amount);
+    return amount;
+  });
+}
 function calcRemedy(){
   var grand = remedyGrand();
   var items = 0, grams = 0;
@@ -2045,8 +2059,8 @@ function saveRemedy(){
   if (grand <= 0) { toast('Nhập giá 1 thang', 'error'); return; }
 
   var thang = remedyThang();
-  var need = {}, totalG = 0;
-  items.forEach(function(it){ need[it.pid] = (need[it.pid] || 0) + it.g / 1000 * thang; totalG += it.g; });
+  var need = {};
+  items.forEach(function(it){ need[it.pid] = (need[it.pid] || 0) + it.g / 1000 * thang; });
   for (var pid in need) {
     var p = findProduct(pid);
     if (!p) { toast('Vị thuốc không còn tồn tại', 'error'); return; }
@@ -2058,16 +2072,13 @@ function saveRemedy(){
   var oname = capWords(($('#remedyName') || {}).value) || 'Đơn thuốc lẻ';
   var oid = uid('OD');
   var ts = Date.now();
-  var allocated = 0;
+  /* Chia tiền theo gram; dòng cuối nhận phần dư để tổng khớp tuyệt đối. */
+  var amounts = allocateRemedyAmounts(grand, items);
   items.forEach(function(it, idx){
     var p = findProduct(it.pid);
     var kg = it.g / 1000 * thang;
     p.stock = dec(p.stock - kg);
-    /* Chia tiền theo gram; dòng cuối nhận phần dư để tổng khớp tuyệt đối. */
-    var amount = idx === items.length - 1
-      ? dec(grand - allocated)
-      : dec(totalG > 0 ? grand * (it.g / totalG) : 0);
-    allocated = dec(allocated + amount);
+    var amount = amounts[idx];
     var tx = {
       id: uid('TX'), date: date, type: 'BAN', productId: it.pid,
       qty: dec(kg), price: kg > 0 ? dec(amount / kg) : 0,
@@ -2088,11 +2099,14 @@ function txCogs(t){
   var p = findProduct(t.productId);
   return num(t.qty) * (p ? num(p.costPrice) : 0);
 }
-function renderStats(){
-  var today = todayISO(), ym = thisMonth(), yr = thisYear();
+/* Hàm thuần để test: không đọc DOM, không phụ thuộc db toàn cục. */
+function computeStats(transactions, products, today){
+  var ym = String(today || '').slice(0, 7), yr = String(today || '').slice(0, 4);
   var dExp = 0, dCogs = 0, mImp = 0, mExp = 0, mCogs = 0, yExp = 0, yCogs = 0;
-  db.transactions.forEach(function(t){
-    if (!t.date) return;
+  var byId = {};
+  (products || []).forEach(function(p){ byId[p.id] = p; });
+  (transactions || []).forEach(function(t){
+    if (!t || !t.date) return;
     var inDay = t.date === today;
     var inMon = t.date.indexOf(ym) === 0;
     var inYear = t.date.indexOf(yr) === 0;
@@ -2102,11 +2116,22 @@ function renderStats(){
       if (inMon) mImp += v;
       return;
     }
-    var c = txCogs(t);
+    var c = t.cost != null
+      ? num(t.cost)
+      : num(t.qty) * (byId[t.productId] ? num(byId[t.productId].costPrice) : 0);
     if (inDay) { dExp += v; dCogs += c; }
     if (inMon) { mExp += v; mCogs += c; }
     if (inYear) { yExp += v; yCogs += c; }
   });
+  return {
+    dExp: dExp, dCogs: dCogs, mImp: mImp, mExp: mExp, mCogs: mCogs,
+    yExp: yExp, yCogs: yCogs,
+    profitDay: dExp - dCogs, profitMonth: mExp - mCogs, profitYear: yExp - yCogs,
+    stock: (products || []).reduce(function(a, p){ return a + num(p.stock); }, 0)
+  };
+}
+function renderStats(){
+  var s = computeStats(db.transactions, db.products, todayISO());
   var set = function(id, v){ var n = $('#' + id); if (n) n.textContent = v; };
   var setProfit = function(id, v){
     var n = $('#' + id);
@@ -2114,20 +2139,18 @@ function renderStats(){
     n.textContent = fmtMoney(v);
     n.className = v < 0 ? 'txt-red' : '';
   };
-  set('statImport', fmtMoney(mImp));
-  set('statExport', fmtMoney(mExp));
-  set('statExportDay', fmtMoney(dExp));
-  set('statExportYear', fmtMoney(yExp));
-  setProfit('statProfitDay', dExp - dCogs);
-  setProfit('statProfitYear', yExp - yCogs);
-  var profit = mExp - mCogs;
+  set('statImport', fmtMoney(s.mImp));
+  set('statExport', fmtMoney(s.mExp));
+  set('statExportDay', fmtMoney(s.dExp));
+  set('statExportYear', fmtMoney(s.yExp));
+  setProfit('statProfitDay', s.profitDay);
+  setProfit('statProfitYear', s.profitYear);
   var pn = $('#statProfit');
   if (pn) {
-    pn.textContent = fmtMoney(profit);
-    pn.className = 'stat__v ' + (profit < 0 ? 'txt-red' : '');
+    pn.textContent = fmtMoney(s.profitMonth);
+    pn.className = 'stat__v ' + (s.profitMonth < 0 ? 'txt-red' : '');
   }
-  var stock = db.products.reduce(function(a, p){ return a + num(p.stock); }, 0);
-  set('statStock', fmtQty(stock));
+  set('statStock', fmtQty(s.stock));
 }
 /* ================= PHÂN TRANG ================= */
 function mkPageBtn(label, target, disabled, kind, current){
@@ -3599,7 +3622,7 @@ function renderBackupInfo(){
     ? 'Chưa sao lưu'
     : (last === todayISO() ? 'Đã sao lưu hôm nay' : 'Sao lưu ' + bakDateText(last));
 }
-function downloadBackup(manual){
+function downloadBackup(manual, filename){
   var url = null;
   try {
     var payload = {
@@ -3612,7 +3635,7 @@ function downloadBackup(manual){
     url = URL.createObjectURL(blob);
     var a = el('a');
     a.href = url;
-    a.download = 'kho-backup-' + todayISO() + '.json';
+    a.download = filename || ('kho-backup-' + todayISO() + '.json');
     a.rel = 'noopener';
     doc.body.appendChild(a);
     a.click();
@@ -3626,6 +3649,15 @@ function downloadBackup(manual){
   renderBackupInfo();
   if (manual) toast('Đã tải file sao lưu về máy');
   return true;
+}
+function backupStamp(){
+  var d = new Date();
+  return todayISO() + '-' + pad2(d.getHours()) + pad2(d.getMinutes());
+}
+/* Tải snapshot hiện tại trước khi restore. Trả false nếu trình duyệt chặn,
+   để restoreFromFile dừng lại thay vì ghi đè mù. */
+function backupBeforeRestore(){
+  return downloadBackup(false, 'kho-backup-truoc-restore-' + backupStamp() + '.json');
 }
 function maybeAutoBackup(){
   if (!backupAutoOn()) return false;
@@ -3667,9 +3699,14 @@ function restoreFromFile(file){
       bak.prescriptions.length + ' đơn thuốc?\n\n' +
       'Dữ liệu hiện tại (kể cả trên Cloud) sẽ bị thay thế hoàn toàn.';
     if (!confirm(msg)) return;
+    /* Luôn lưu snapshot hiện tại trước khi ghi đè; nếu không tải được thì hủy. */
+    if (!backupBeforeRestore()) {
+      toast('Không tạo được bản sao lưu trước khi khôi phục — đã hủy thao tác', 'error');
+      return;
+    }
     db = bak;
     /* Restore là ghi đè chủ động: bỏ qua kiểm tra conflict và ép ghi lên Cloud. */
-    commit('Đã khôi phục từ file sao lưu', true);
+    commit('Đã khôi phục từ file sao lưu (đã lưu bản trước đó)', true);
   };
   fr.onerror = function(){ toast('Không đọc được file', 'error'); };
   fr.readAsText(file);

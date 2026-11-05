@@ -124,6 +124,7 @@ function validateState(d){
     return { state, errors: ['Dữ liệu không phải object'], warnings };
   }
   const fail = msg => { if (errors.length < 20) errors.push(msg); };
+  const warn = msg => { if (warnings.length < 50) warnings.push(msg); };
   for (const key of ['products', 'transactions', 'prescriptions']) {
     if (!Array.isArray(d[key])) fail('Thiếu mảng ' + key);
   }
@@ -141,8 +142,8 @@ function validateState(d){
     if (!isNonNegNumber(p.costPrice)) fail(label + ' "' + name + '": giá nhập phải >= 0');
     const id = String(p.id || crypto.randomUUID());
     const nameKey = name.toLowerCase();
-    if (productIds.has(id)) { warnings.push('Bỏ sản phẩm trùng id: ' + id); return; }
-    if (productNames.has(nameKey)) { warnings.push('Bỏ sản phẩm trùng tên: ' + name); return; }
+    if (productIds.has(id)) { warn('Bỏ sản phẩm trùng id: ' + id); return; }
+    if (productNames.has(nameKey)) { warn('Bỏ sản phẩm trùng tên: ' + name); return; }
     productIds.add(id);
     productNames.add(nameKey);
     state.products.push({ id, name, stock: decNum(p.stock), costPrice: decNum(p.costPrice) });
@@ -156,6 +157,7 @@ function validateState(d){
     if (!DATE_RE.test(String(t.date || ''))) { fail(label + ': ngày phải dạng YYYY-MM-DD'); return; }
     const productId = String(t.productId || '').trim();
     if (!productId) { fail(label + ': thiếu productId'); return; }
+    if (!productIds.has(productId)) warn(label + ': productId không có trong danh sách sản phẩm: ' + productId);
     if (!(Number(t.qty) > 0)) fail(label + ': số lượng phải > 0');
     if (!isNonNegNumber(t.price)) fail(label + ': đơn giá phải >= 0');
     if (!isNonNegNumber(t.total)) fail(label + ': thành tiền phải >= 0');
@@ -165,7 +167,7 @@ function validateState(d){
     if (t.thang != null && !(Number(t.thang) >= 1)) fail(label + ': số thang phải >= 1');
     if (t.unitPrice != null && !isNonNegNumber(t.unitPrice)) fail(label + ': giá 1 thang phải >= 0');
     const id = String(t.id || crypto.randomUUID());
-    if (txIds.has(id)) { warnings.push('Bỏ giao dịch trùng id: ' + id); return; }
+    if (txIds.has(id)) { warn('Bỏ giao dịch trùng id: ' + id); return; }
     txIds.add(id);
     state.transactions.push({
       id, date: String(t.date), type: t.type, productId,
@@ -187,8 +189,8 @@ function validateState(d){
     const id = String(r.id || crypto.randomUUID());
     /* prescriptions.name là UNIQUE phân biệt hoa/thường. */
     const nameKey = name;
-    if (rxIds.has(id)) { warnings.push('Bỏ đơn thuốc trùng id: ' + id); return; }
-    if (rxNames.has(nameKey)) { warnings.push('Bỏ đơn thuốc trùng tên: ' + name); return; }
+    if (rxIds.has(id)) { warn('Bỏ đơn thuốc trùng id: ' + id); return; }
+    if (rxNames.has(nameKey)) { warn('Bỏ đơn thuốc trùng tên: ' + name); return; }
     rxIds.add(id);
     rxNames.add(nameKey);
     const itemIds = new Set();
@@ -197,8 +199,9 @@ function validateState(d){
       if (!item || typeof item !== 'object') { fail(label + ' dòng ' + (j + 1) + ': không hợp lệ'); return; }
       const itemPid = String(item.productId || '').trim();
       if (!itemPid) { fail(label + ' dòng ' + (j + 1) + ': thiếu productId'); return; }
+      if (!productIds.has(itemPid)) warn(label + ' dòng ' + (j + 1) + ': productId không có trong danh sách sản phẩm: ' + itemPid);
       if (!(Number(item.grams) > 0)) { fail(label + ' dòng ' + (j + 1) + ': số gram phải > 0'); return; }
-      if (itemIds.has(itemPid)) { warnings.push('Bỏ vị trùng trong đơn "' + name + '"'); return; }
+      if (itemIds.has(itemPid)) { warn('Bỏ vị trùng trong đơn "' + name + '"'); return; }
       itemIds.add(itemPid);
       items.push({ productId: itemPid, grams: decNum(item.grams) });
     });
@@ -463,7 +466,12 @@ export default {
           if (len > MAX_BODY) return jsonRes({ success: false, error: 'Payload too large' }, 413);
           const text = await request.text();
           if (text.length > MAX_BODY) return jsonRes({ success: false, error: 'Payload too large' }, 413);
-          const body = JSON.parse(text);
+          let body;
+          try {
+            body = JSON.parse(text);
+          } catch (e) {
+            return jsonRes({ success: false, error: 'JSON không hợp lệ' }, 400);
+          }
           const checked = validateState(body);
           if (checked.errors.length) {
             return jsonRes({ success: false, error: 'Dữ liệu không hợp lệ', details: checked.errors }, 400);
