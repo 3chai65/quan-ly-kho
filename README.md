@@ -26,6 +26,8 @@ tồn kho, sổ thu/chi, thống kê doanh thu 12 tháng.
 npx wrangler dev      # dev local → http://localhost:8787
 npx wrangler deploy   # deploy tay
 # hoặc: push lên main → Actions tự deploy
+
+npx wrangler secret put APP_TOKEN   # bắt buộc 1 lần trước khi dùng bản có token
 ```
 
 Không có `package.json`; không cần `npm install`.
@@ -48,16 +50,22 @@ Không có `package.json`; không cần `npm install`.
    Client gửi header `X-Base-Updated: <updatedAt>`; server so với `app_meta.source_updated_at`,
    nếu bản trên server mới hơn → **409 conflict** (client hiện dialog "Lấy bản mới nhất" /
    "Giữ bản máy này", hoặc gửi `X-Force: 1` để ép ghi đè).
-5. **Không có auth**: ai có URL đều đọc/ghi/xóa được dữ liệu.
-   → Không chia sẻ link; backup thường xuyên; cân nhắc để repo GitHub ở chế độ **private**.
+5. **Có mã truy cập (token)**: mọi API `/api/*` cần header `Authorization: Bearer <APP_TOKEN>`;
+   trang HTML (`/`) mở được nhưng không chứa dữ liệu. Token lưu localStorage, nhập 1 lần
+   mỗi máy (xóa cache thì nhập lại). Secret đặt qua `npx wrangler secret put APP_TOKEN`
+   — không nằm trong git. Lộ/quên token → đặt secret mới + deploy lại; máy chủ so sánh
+   token sau khi `trim()` để tránh lệch ký tự xuống dòng.
 
 ## API
 
-| Endpoint | Mô tả |
-|---|---|
-| `GET /api/state` | Lấy toàn bộ state (JSON) |
-| `PUT /api/state` | Ghi snapshot (cần `X-Base-Updated`, xem mục 4) |
-| `/sync` | Cũ (KV), không dùng nữa |
+| Endpoint | Cần token? | Mô tả |
+|---|---|---|
+| `GET /` | Không (shell trống) | Trang app tĩnh, không có dữ liệu |
+| `GET /api/state` | **Có** | Lấy toàn bộ state (JSON) |
+| `PUT /api/state` | **Có** | Ghi snapshot (cần `X-Base-Updated`, xem mục 4) |
+| `/sync` | — | Cũ (KV), không dùng nữa |
+
+Token gửi qua header `Authorization: Bearer <APP_TOKEN>`.
 
 ## Quy ước làm việc
 
@@ -65,4 +73,4 @@ Không có `package.json`; không cần `npm install`.
 - Sửa logic tiền/tồn kho = sửa vùng nhạy cảm nhất của app — test kỹ trên dev trước khi deploy.
 - Mỗi thay đổi đáng kể → ghi vào `CHANGELOG.md`.
 - README này là context chung cho người và AI: giữ ngắn, chỉ ghi thông tin còn đúng;
-  **không** đưa URL production, database_id, KV id hay thông tin cá nhân vào đây (repo đang public).
+  **không** đưa URL production, database_id, KV id hay thông tin cá nhân vào đây (repo đã để private).

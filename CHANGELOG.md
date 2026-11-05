@@ -5,6 +5,27 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.8.0] - 2026-11-05
+
+### Thêm mới
+
+- **Mã truy cập (token) cho mọi API `/api/*`**: Worker kiểm tra header `Authorization: Bearer
+  <APP_TOKEN>` trước khi xử lý; thiếu/sai → 401. Trang HTML (`/`) vẫn mở được nhưng không
+  chứa dữ liệu — dữ liệu chỉ trả về khi có token.
+- Token lưu trong `localStorage` của trình duyệt, nhập 1 lần mỗi máy; app gửi kèm header
+  tự động cho cả `GET` (pullState) và `PUT` (pushState).
+- Secret `APP_TOKEN` đặt qua `npx wrangler secret put APP_TOKEN`, không nằm trong git;
+  Worker so sánh token sau khi `trim()`.
+- Repo GitHub chuyển sang **private**; README viết lại tối giản (bỏ URL, database_id, KV id,
+  thông tin cá nhân) và ghi rõ các quy tắc logic cốt lõi (tiền REAL chỉ cắt lẻ khi hiển
+  thị, tồn kho kg/REAL + check 1e-9, conflict 409 qua `X-Base-Updated`).
+- `preview_urls = false` trong `wrangler.toml`.
+
+### Bảo mật
+
+- Trước bản này: ai có link đều đọc/ghi/xóa được toàn bộ dữ liệu. Từ 1.8.0, link không
+  còn đủ — cần token. Backup JSON vẫn bắt buộc vì PUT `/api/state` ghi đè toàn bộ snapshot.
+
 ## [1.7.0] - 2026-11-04
 
 ### Thay đổi phá vỡ

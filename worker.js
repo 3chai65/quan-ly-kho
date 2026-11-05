@@ -3534,6 +3534,39 @@ function saveTxEdit(){
   closeTxEdit();
   commit('Đã cập nhật giao dịch');
 }
+/* ==== Mã truy cập (1 người dùng) ==== */
+function getToken(){
+  var t = null;
+  try { t = localStorage.getItem('qlk_token'); } catch (e) {}
+  if (t) return t;
+  t = prompt('Nhập mã truy cập:');
+  if (t) {
+    t = String(t).trim();
+    if (t) { try { localStorage.setItem('qlk_token', t); } catch (e) {} return t; }
+  }
+  return null;
+}
+function authFetch(url, opts){
+  var t = getToken();
+  if (!t) return Promise.resolve(null);
+  var o = {};
+  var src = opts || {};
+  for (var k in src) o[k] = src[k];
+  var h = {};
+  var sh = src.headers || {};
+  for (var k2 in sh) h[k2] = sh[k2];
+  h['Authorization'] = 'Bearer ' + t;
+  o.headers = h;
+  o.cache = 'no-store';
+  return fetch(url, o).then(function(r){
+    if (r.status === 401) {
+      try { localStorage.removeItem('qlk_token'); } catch (e) {}
+      alert('Mã truy cập sai hoặc đã bị xóa. Tải lại trang và nhập mã đúng.');
+      return null;
+    }
+    return r;
+  });
+}
 /* ================= ĐỒNG BỘ D1 ================= */
 function cloudConflict(){
   if (conflictOpen) return Promise.resolve(false);
@@ -3548,13 +3581,12 @@ function pushState(manual, force){
   var sent = num(db.updatedAt);
   var headers = { 'Content-Type': 'application/json', 'X-Base-Updated': String(cloudBase) };
   if (force) headers['X-Force'] = '1';
-  return fetch('/api/state', {
+  return authFetch('/api/state', {
     method: 'PUT',
     headers: headers,
-    body: JSON.stringify(db),
-    cache: 'no-store'
+    body: JSON.stringify(db)
   }).then(function(r){
-    return r.json();
+    return r ? r.json() : null;
   }).then(function(d){
     if (d && d.conflict) return cloudConflict();
     var ok = !!(d && d.success);
@@ -3571,9 +3603,9 @@ function pushState(manual, force){
   });
 }
 function pullState(manual, forceLatest){
-  return fetch('/api/state?t=' + Date.now(), { cache: 'no-store' })
+  return authFetch('/api/state?t=' + Date.now())
     .then(function(r){
-      return r.json();
+      return r ? r.json() : null;
     })
     .then(function(d){
       var server = d && d.success ? sanitize(d.data) : null;
@@ -4195,6 +4227,26 @@ export default {
 
     // Không cho website khác gọi API (không còn CORS).
     if (method === 'OPTIONS') return new Response(null, { status: 204 });
+
+    // ---------- Bảo vệ bằng mã truy cập (1 người dùng) ----------
+    // Trang HTML (/) và favicon/robots vẫn mở được; mọi API đều cần token.
+    const PUBLIC_PATHS = ['/', '/favicon.ico', '/robots.txt'];
+    if (method !== 'OPTIONS' && PUBLIC_PATHS.indexOf(url.pathname) === -1) {
+      if (!env.APP_TOKEN) {
+        if (url.pathname.indexOf('/api/') === 0) {
+          return jsonRes({ success: false, error: 'Server chưa cấu hình APP_TOKEN' }, 500);
+        }
+        return new Response('Server chưa cấu hình APP_TOKEN', { status: 500 });
+      }
+      const envToken = String(env.APP_TOKEN).trim();
+      const auth = String(request.headers.get('Authorization') || '').trim();
+      if (auth !== 'Bearer ' + envToken) {
+        if (url.pathname.indexOf('/api/') === 0) {
+          return jsonRes({ success: false, error: 'Unauthorized' }, 401);
+        }
+        return new Response('Unauthorized', { status: 401 });
+      }
+    }
 
     if (url.pathname === '/favicon.ico') {
       return new Response(null, { status: 204, headers: { 'Cache-Control': 'public, max-age=86400' } });
