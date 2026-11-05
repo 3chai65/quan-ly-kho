@@ -1,7 +1,7 @@
 # Quản Lý Kho
 
 App quản lý kho dược liệu cá nhân (1 người dùng): nhập hàng, bán lẻ, đơn thuốc chén,
-tồn kho, sổ thu/chi, thống kê doanh thu 12 tháng.
+tồn kho, thống kê doanh thu 12 tháng.
 
 ## Stack
 
@@ -15,7 +15,8 @@ tồn kho, sổ thu/chi, thống kê doanh thu 12 tháng.
 | File/Thư mục | Vai trò |
 |---|---|
 | `worker.js` | Toàn bộ code: frontend + API |
-| `migrations/0001_init.sql` | Schema D1 (products, transactions, prescriptions, prescription_items, ledger, app_meta) |
+| `migrations/0001_init.sql` | Schema D1 ban đầu (products, transactions, prescriptions, prescription_items, ledger, app_meta) |
+| `migrations/0002_drop_ledger.sql` | Xóa bảng `ledger` (gỡ tính năng Sổ Thu Chi) |
 | `scripts/backup-to-sql.mjs` | Import backup JSON vào D1 |
 | `kho-backup/` | Backup JSON — **không được commit** (đã gitignore) |
 | `CHANGELOG.md` | Lịch sử thay đổi (Keep a Changelog + SemVer) |

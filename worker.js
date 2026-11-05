@@ -217,23 +217,6 @@ border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;fon
 .bak-actions{display:flex;flex-wrap:wrap;gap:8px}
 .chk{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text2);cursor:pointer;user-select:none}
 .chk input{width:18px;height:18px;accent-color:var(--brand);cursor:pointer}
-/* ---------- sổ thu chi ---------- */
-.ledger-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
-.ledger-row .field{margin:0}
-.ledger-type{display:flex;gap:8px}
-.ledger-type .btn[aria-pressed=true]{font-weight:700}
-.ledger-type .btn--green[aria-pressed=true]{background:var(--green-soft);border-color:var(--green);color:var(--green-text);box-shadow:var(--ring)}
-.ledger-type .btn--danger[aria-pressed=true]{background:var(--red-soft);border-color:var(--red-text);color:var(--red-text);box-shadow:var(--ring)}
-.ledger-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
-.ledger-sum__cell{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r-sm);padding:10px 12px}
-.ledger-sum__cell .lbl{margin-bottom:4px}
-@media (max-width:600px){
-.ledger-type{flex:1 1 100%}
-.ledger-type .btn{flex:1}
-.ledger-sum{grid-template-columns:1fr 1fr;gap:8px}
-.ledger-row .field{flex:1 1 100%}
-.ledger-save{flex:1 1 100%}
-}
 .total{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .total__v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
 .hintbox{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
@@ -694,65 +677,6 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
       </button>
     </form>
   </details>
-  <details class="card mt-18" id="ledgerBox">
-    <summary class="card__head">
-      <svg class="ico chev" aria-hidden="true"><use href="#i-chev-r"/></svg>
-      <svg class="ico txt-brand" aria-hidden="true"><use href="#i-book"/></svg>
-      <h2 class="card__title">4. Sổ Thu Chi</h2>
-      <span class="spacer"></span>
-      <span class="hint" id="ledgerCount">0 giao dịch · tháng này</span>
-    </summary>
-    <div class="card__body">
-      <form id="ledgerForm" class="ledger-row" autocomplete="off" novalidate>
-        <div class="ledger-type" role="group" aria-label="Loại giao dịch">
-          <button type="button" class="btn btn--green" id="ledgerTypeThu" aria-pressed="true">
-            <svg class="ico" aria-hidden="true"><use href="#i-arrow-down-left"/></svg>Thu
-          </button>
-          <button type="button" class="btn btn--danger" id="ledgerTypeChi" aria-pressed="false">
-            <svg class="ico" aria-hidden="true"><use href="#i-arrow-up-right"/></svg>Chi
-          </button>
-        </div>
-        <div class="field">
-          <label class="lbl" for="ledgerAmount">Số tiền</label>
-          <input class="inp inp--num" id="ledgerAmount" type="number" min="0" inputmode="decimal" placeholder="0" aria-describedby="ledgerHint">
-        </div>
-        <div class="field">
-          <label class="lbl" for="ledgerCat">Danh mục</label>
-          <select class="inp" id="ledgerCat"></select>
-        </div>
-        <button type="submit" class="btn btn--primary ledger-save">Ghi</button>
-      </form>
-      <p class="hint mt-10" id="ledgerHint">Thu = tiền vào · Chi = tiền ra. Chọn danh mục phù hợp để theo dõi lãi lỗ.</p>
-      <div class="ledger-sum" aria-live="polite">
-        <div class="ledger-sum__cell">
-          <span class="lbl">Thu tháng</span>
-          <div class="b num txt-green" id="ledgerSumThu">0</div>
-        </div>
-        <div class="ledger-sum__cell">
-          <span class="lbl">Chi tháng</span>
-          <div class="b num txt-red" id="ledgerSumChi">0</div>
-        </div>
-        <div class="ledger-sum__cell">
-          <span class="lbl">Số dư</span>
-          <div class="b num txt-brand" id="ledgerSumNet">0</div>
-        </div>
-      </div>
-      <div class="tw">
-        <table class="his">
-          <caption class="sr">Giao dịch thu chi trong tháng</caption>
-          <thead><tr>
-            <th scope="col">Ngày</th>
-            <th scope="col">Loại</th>
-            <th scope="col">Danh mục</th>
-            <th scope="col">Số tiền</th>
-            <th scope="col" class="c-act"><span class="sr">Thao tác</span></th>
-          </tr></thead>
-          <tbody id="ledgerBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </details>
-
   <div class="grid2 mt-18">
     <details class="card" id="chartBox">
       <summary class="card__head">
@@ -1341,7 +1265,7 @@ function refPrice(p){
 /* ================= TRẠNG THÁI ================= */
 var KEY = 'kho_db_local_v1';
 var PAGE_SIZE = 10;
-var db = { products: [], transactions: [], prescriptions: [], ledger: [], updatedAt: 0 };
+var db = { products: [], transactions: [], prescriptions: [], updatedAt: 0 };
 var invPage = 1, impPage = 1, expPage = 1;
 var impAll = false, expAll = false;
 var cloudBase = 0;
@@ -1349,7 +1273,7 @@ var conflictOpen = false;
 var toastTimer = null;
 
 function sanitize(d){
-  var o = { products: [], transactions: [], prescriptions: [], ledger: [], updatedAt: 0 };
+  var o = { products: [], transactions: [], prescriptions: [], updatedAt: 0 };
   if (!d || typeof d !== 'object') return o;
   o.updatedAt = dec(d.updatedAt);
   if (Array.isArray(d.products)) {
@@ -1403,19 +1327,6 @@ function sanitize(d){
         total: dec(r.total),
         thang: Math.max(1, Math.round(num(r.thang)) || 1),
         updatedAt: dec(r.updatedAt)
-      });
-    });
-  }
-  if (Array.isArray(d.ledger)) {
-    d.ledger.forEach(function(t){
-      if (!t || !(num(t.amount) > 0)) return;
-      o.ledger.push({
-        id: String(t.id || uid('LG')),
-        date: String(t.date || ''),
-        type: t.type === 'CHI' ? 'CHI' : 'THU',
-        amount: dec(t.amount),
-        category: String(t.category || 'Khác'),
-        ts: num(t.ts) > 0 ? num(t.ts) : Date.now()
       });
     });
   }
@@ -2784,106 +2695,6 @@ function recFixAll(){
   commit('Đã chỉnh tồn ' + list.length + ' vị thuốc');
   renderRec();
 }
-/* ================= SỔ THU CHI ================= */
-var LEDGER_CATS = {
-  THU: ['Bán hàng', 'Bán lẻ', 'Thu nợ', 'Khác'],
-  CHI: ['Nhập hàng', 'Tiền nhà', 'Lương', 'Điện nước', 'Vận chuyển', 'Khác']
-};
-var ledgerType = 'THU';
-function ledgerCats(){
-  var sel = $('#ledgerCat');
-  if (!sel) return;
-  sel.textContent = '';
-  LEDGER_CATS[ledgerType].forEach(function(c){
-    var o = el('option');
-    o.value = c;
-    o.textContent = c;
-    sel.appendChild(o);
-  });
-}
-function setLedgerType(t){
-  ledgerType = t === 'CHI' ? 'CHI' : 'THU';
-  var thuBtn = $('#ledgerTypeThu'), chiBtn = $('#ledgerTypeChi');
-  if (thuBtn) thuBtn.setAttribute('aria-pressed', ledgerType === 'THU' ? 'true' : 'false');
-  if (chiBtn) chiBtn.setAttribute('aria-pressed', ledgerType === 'CHI' ? 'true' : 'false');
-  ledgerCats();
-}
-function ledgerMonthEntries(){
-  var ym = thisMonth();
-  return db.ledger.filter(function(t){ return String(t.date || '').indexOf(ym) === 0; })
-    .sort(function(a, b){ return num(b.ts) - num(a.ts); });
-}
-function renderLedger(){
-  var tbody = $('#ledgerBody');
-  if (!tbody) return;
-  var rows = ledgerMonthEntries();
-  var totThu = 0, totChi = 0;
-  rows.forEach(function(t){ if (t.type === 'THU') totThu += num(t.amount); else totChi += num(t.amount); });
-  var balance = totThu - totChi;
-  var set = function(id, v){ var n = $('#' + id); if (n) n.textContent = fmtMoney(v); };
-  set('ledgerSumThu', totThu);
-  set('ledgerSumChi', totChi);
-  var net = $('#ledgerSumNet');
-  if (net) {
-    net.textContent = (balance < 0 ? '−' : '') + fmtMoney(Math.abs(balance));
-    net.className = 'b num ' + (balance >= 0 ? 'txt-brand' : 'txt-red');
-  }
-  var cnt = $('#ledgerCount');
-  if (cnt) cnt.textContent = rows.length + ' giao dịch · tháng này';
-  tbody.textContent = '';
-  if (!rows.length) {
-    emptyRow(tbody, 5, 'Chưa có giao dịch thu/chi trong tháng.');
-    return;
-  }
-  rows.forEach(function(t){
-    var tr = el('tr');
-    tr.className = 'is-row';
-    tr.appendChild(el('td', 'muted small', dateVN(t.date)));
-    var typeCell = el('td', 'b ' + (t.type === 'THU' ? 'txt-green' : 'txt-red'), t.type === 'THU' ? 'Thu' : 'Chi');
-    typeCell.setAttribute('data-label', 'Loại');
-    tr.appendChild(typeCell);
-    var catCell = el('td', '', t.category);
-    catCell.setAttribute('data-label', 'Danh mục');
-    tr.appendChild(catCell);
-    var amountCell = el('td', 'num b ' + (t.type === 'THU' ? 'txt-green' : 'txt-red'), (t.type === 'THU' ? '+' : '−') + fmtMoney(t.amount));
-    amountCell.setAttribute('data-label', 'Số tiền');
-    tr.appendChild(amountCell);
-    var td = el('td', 'c-act');
-    td.appendChild(rowMenu([
-      { label: 'Xóa giao dịch', icon: 'trash', action: 'del-ledger', id: t.id, danger: true }
-    ], 'Thao tác với giao dịch ' + dateVN(t.date)));
-    tr.appendChild(td);
-    tbody.appendChild(tr);
-  });
-}
-function saveLedger(){
-  var amount = dec(num(($('#ledgerAmount') || {}).value));
-  var cat = ($('#ledgerCat') || {}).value;
-  if (!(amount > 0)) { toast('Nhập số tiền lớn hơn 0', 'error'); var a = $('#ledgerAmount'); if (a) a.focus(); return; }
-  if (!cat) { toast('Chọn danh mục', 'error'); var c = $('#ledgerCat'); if (c) c.focus(); return; }
-  var now = Date.now();
-  db.ledger.push({
-    id: uid('LG'),
-    date: todayISO(),
-    type: ledgerType,
-    amount: amount,
-    category: cat,
-    ts: now
-  });
-  var f = $('#ledgerAmount');
-  if (f) f.value = '';
-  if (f) f.focus();
-  commit((ledgerType === 'THU' ? 'Đã lưu thu ' : 'Đã lưu chi ') + fmtMoney(amount) + ' — ' + cat);
-}
-function delLedger(id){
-  var t = null;
-  for (var i = 0; i < db.ledger.length; i++) if (db.ledger[i].id === id) { t = db.ledger[i]; break; }
-  if (!t) return;
-  if (!confirm('Xóa giao dịch ' + (t.type === 'THU' ? 'thu' : 'chi') + ' ' + fmtMoney(t.amount) + ' ngày ' + dateVN(t.date) + '?')) return;
-  db.ledger = db.ledger.filter(function(x){ return x.id !== id; });
-  commit('Đã xóa giao dịch sổ thu chi');
-}
-
 /* ================= HOÀN TÁC CHUẨN HOÁ CŨ ================= */
 var MIG_KEY = 'kho_migrate_retail_v1';
 var MIG_BAK = 'kho_backup_premig_v1';
@@ -3678,7 +3489,7 @@ function downloadBackup(manual){
 function maybeAutoBackup(){
   if (!backupAutoOn()) return false;
   if (backupLastDate() === todayISO()) return false;
-  if (!db.products.length && !db.transactions.length && !db.prescriptions.length && !db.ledger.length) return false;
+  if (!db.products.length && !db.transactions.length && !db.prescriptions.length) return false;
   if (!downloadBackup(false)) return false;
   toast('Đã tự sao lưu dữ liệu hôm nay');
   return true;
@@ -3687,7 +3498,7 @@ function parseBackup(text){
   var obj = JSON.parse(text);
   var d = obj && obj.data ? obj.data : obj;
   if (!d || typeof d !== 'object') return null;
-  if (!Array.isArray(d.products) && !Array.isArray(d.transactions) && !Array.isArray(d.prescriptions) && !Array.isArray(d.ledger)) return null;
+  if (!Array.isArray(d.products) && !Array.isArray(d.transactions) && !Array.isArray(d.prescriptions)) return null;
   return sanitize(d);
 }
 function restoreFromFile(file){
@@ -3700,8 +3511,7 @@ function restoreFromFile(file){
     if (!bak) { toast('File sao lưu không hợp lệ', 'error'); return; }
     var msg = 'Khôi phục ' + bak.products.length + ' vị thuốc, ' +
       bak.transactions.length + ' giao dịch, ' +
-      bak.prescriptions.length + ' đơn thuốc, ' +
-      bak.ledger.length + ' sổ thu chi?\nDữ liệu hiện tại sẽ bị thay thế.';
+      bak.prescriptions.length + ' đơn thuốc?\nDữ liệu hiện tại sẽ bị thay thế.';
     if (!confirm(msg)) return;
     db = bak;
     db.updatedAt = Date.now();
@@ -3719,7 +3529,6 @@ function renderAll(){
   renderInventory();
   renderHistory('imp');
   renderHistory('exp');
-  renderLedger();
   renderStats();
   var cb = $('#chartBox');
   if (cb && cb.open) renderChart();
@@ -3756,7 +3565,6 @@ function handleAction(btn){
     }
     case 'edit-prod': openEdit(id); break;
     case 'del-prod': delProduct(id); break;
-    case 'del-ledger': delLedger(id); break;
     case 'del-nhap-item': {
       var ix = parseInt(btn.getAttribute('data-idx'), 10);
       if (ix >= 0 && ix < nhapList.length) { nhapList.splice(ix, 1); renderNhapList(); }
@@ -3849,12 +3657,6 @@ function bindEvents(){
 
   var nf = $('#nhapForm');
   if (nf) nf.addEventListener('submit', saveNhap);
-  var lf = $('#ledgerForm');
-  if (lf) lf.addEventListener('submit', function(e){ e.preventDefault(); saveLedger(); });
-  var ltb = $('#ledgerTypeThu');
-  if (ltb) ltb.addEventListener('click', function(){ setLedgerType('THU'); });
-  var lcb = $('#ledgerTypeChi');
-  if (lcb) lcb.addEventListener('click', function(){ setLedgerType('CHI'); });
   if (nf) nf.addEventListener('keydown', function(e){
     if (e.key !== 'Enter' || e.defaultPrevented) return;
     if (!e.target || e.target.tagName !== 'INPUT') return;
@@ -4001,7 +3803,7 @@ function bindEvents(){
 function init(){
   var remote = window.__DB__ ? sanitize(window.__DB__) : null;
   var local = readLocal();
-  db = remote || local || { products: [], transactions: [], prescriptions: [], ledger: [], updatedAt: 0 };
+  db = remote || local || { products: [], transactions: [], prescriptions: [], updatedAt: 0 };
   cloudBase = remote ? num(remote.updatedAt) : num(db.updatedAt);
 
   var m = window.__THEME__ || 'system';
@@ -4024,7 +3826,6 @@ function init(){
   initSuggest();
   resetRetail();
   resetRemedy();
-  setLedgerType('THU');
   renderAll();
   renderBackupInfo();
 
@@ -4098,12 +3899,11 @@ async function getSourceUpdatedAt(db){
 }
 
 async function readState(db){
-  const [productsResult, transactionsResult, prescriptionsResult, prescriptionItemsResult, ledgerResult, sourceUpdatedAt] = await Promise.all([
+  const [productsResult, transactionsResult, prescriptionsResult, prescriptionItemsResult, sourceUpdatedAt] = await Promise.all([
     db.prepare('SELECT id, name, stock_kg AS stock, cost_price_vnd AS costPrice FROM products ORDER BY name COLLATE NOCASE').all(),
     db.prepare('SELECT id, date, type, product_id AS productId, qty_kg AS qty, price_vnd AS price, total_vnd AS total, cost_vnd AS cost, order_id AS oid, order_name AS oname, retail, rx, grams AS g, thang, unit_price_vnd AS unitPrice, ts FROM transactions ORDER BY COALESCE(ts, 0) ASC, id ASC').all(),
     db.prepare('SELECT id, name, total_vnd AS total, thang, updated_at AS updatedAt FROM prescriptions ORDER BY updated_at DESC').all(),
     db.prepare('SELECT prescription_id AS prescriptionId, product_id AS productId, grams FROM prescription_items ORDER BY prescription_id, product_id').all(),
-    db.prepare('SELECT id, date, type, amount_vnd AS amount, category, ts FROM ledger ORDER BY ts DESC').all(),
     getSourceUpdatedAt(db)
   ]);
   const itemsByPrescription = new Map();
@@ -4134,13 +3934,12 @@ async function readState(db){
       return tx;
     }),
     prescriptions: (prescriptionsResult.results || []).map(r => ({ id: String(r.id), name: String(r.name), items: itemsByPrescription.get(r.id) || [], total: decNum(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt) })),
-    ledger: (ledgerResult.results || []).map(l => ({ id: String(l.id), date: String(l.date), type: l.type === 'CHI' ? 'CHI' : 'THU', amount: decNum(l.amount), category: String(l.category), ts: decNum(l.ts) })),
     updatedAt: sourceUpdatedAt
   };
 }
 
 function sanitizeState(d){
-  const out = { products: [], transactions: [], prescriptions: [], ledger: [], updatedAt: 0 };
+  const out = { products: [], transactions: [], prescriptions: [], updatedAt: 0 };
   if (!d || typeof d !== 'object') return out;
   out.updatedAt = decNum(d.updatedAt);
   for (const p of Array.isArray(d.products) ? d.products : []) {
@@ -4167,10 +3966,6 @@ function sanitizeState(d){
     if (!items.length) continue;
     out.prescriptions.push({ id: String(r.id || crypto.randomUUID()), name: String(r.name), items, total: decNum(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt) });
   }
-  for (const l of Array.isArray(d.ledger) ? d.ledger : []) {
-    if (!l || !(decNum(l.amount) > 0)) continue;
-    out.ledger.push({ id: String(l.id || crypto.randomUUID()), date: String(l.date || ''), type: l.type === 'CHI' ? 'CHI' : 'THU', amount: decNum(l.amount), category: String(l.category || 'Khác'), ts: decNum(l.ts) });
-  }
   return out;
 }
 
@@ -4182,7 +3977,6 @@ async function writeState(db, data){
     db.prepare('DELETE FROM prescriptions'),
     db.prepare('DELETE FROM transactions'),
     db.prepare('DELETE FROM products'),
-    db.prepare('DELETE FROM ledger'),
     db.prepare(`INSERT INTO app_meta (key, value) VALUES ('source_updated_at', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(String(now))
   ];
@@ -4197,9 +3991,6 @@ async function writeState(db, data){
     for (const item of r.items) {
       statements.push(db.prepare('INSERT INTO prescription_items (prescription_id, product_id, grams) VALUES (?, ?, ?)').bind(r.id, item.productId, item.grams));
     }
-  }
-  for (const l of state.ledger) {
-    statements.push(db.prepare('INSERT INTO ledger (id, date, type, amount_vnd, category, ts) VALUES (?, ?, ?, ?, ?, ?)').bind(l.id, l.date, l.type, l.amount, l.category, l.ts || now));
   }
   await db.batch(statements);
   return now;

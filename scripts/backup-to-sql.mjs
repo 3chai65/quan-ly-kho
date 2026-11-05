@@ -35,13 +35,11 @@ const add = line => lines.push(line);
 const products = Array.isArray(data.products) ? data.products : [];
 const transactions = Array.isArray(data.transactions) ? data.transactions : [];
 const prescriptions = Array.isArray(data.prescriptions) ? data.prescriptions : [];
-const ledger = Array.isArray(data.ledger) ? data.ledger : [];
 
 add('DELETE FROM prescription_items;');
 add('DELETE FROM prescriptions;');
 add('DELETE FROM transactions;');
 add('DELETE FROM products;');
-add('DELETE FROM ledger;');
 add('DELETE FROM app_meta;');
 
 for (const p of products) {
@@ -68,14 +66,6 @@ for (const r of prescriptions) {
       `INSERT INTO prescription_items (prescription_id, product_id, grams) VALUES (${sqlString(r.id)}, ${sqlString(item.productId)}, ${sqlNumber(item.grams)});`
     );
   }
-}
-
-for (const entry of ledger) {
-  const type = entry.type === 'CHI' ? 'CHI' : 'THU';
-  const ts = Number(entry.ts);
-  add(
-    `INSERT INTO ledger (id, date, type, amount_vnd, category, ts) VALUES (${sqlString(entry.id)}, ${sqlString(entry.date)}, '${type}', ${sqlNumber(entry.amount)}, ${sqlString(entry.category || 'Khác')}, ${sqlNumber(Number.isFinite(ts) && ts > 0 ? ts : sourceUpdatedAt)});`
-  );
 }
 
 add(`INSERT INTO app_meta (key, value) VALUES ('schema_version', '1');`);

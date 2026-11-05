@@ -5,6 +5,20 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.13.0] - 2026-11-05
+
+### Bỏ tính năng Sổ Thu Chi
+
+- Gỡ hoàn toàn mục **4. Sổ Thu Chi** khỏi app (phiên bản trước dùng để ghi thu/chi viết
+  tay): form ghi thu/chi, nút Thu/Chi, danh mục, tổng thu/chi/số dư, lịch sử thu/chi
+  tháng này, khuôn (CSS), bộ đếm trong sao lưu và mã đồng bộ `/api/state`.
+- Dữ liệu không còn dùng tới: bảng `ledger` **trống (0 dòng)** → xóa hẳn bảng bằng
+  `migrations/0002_drop_ledger.sql`. Người dùng chuyển sang ứng dụng khác cho việc thu chi.
+- Backup/khôi phục không còn chứa `ledger`; script `scripts/backup-to-sql.mjs` cũng bỏ
+  phần import/ledger. Các thống kê (nhập/bán/lợi nhuận/tồn kho) không phụ thuộc sổ thu chi
+  nên giữ nguyên.
+- Mục còn lại tự đánh số lại gọn: 1. Đơn bán lẻ · 2. Đơn thuốc chén · 3. Nhập hàng.
+
 ## [1.12.0] - 2026-11-05
 
 ### Thay đổi
