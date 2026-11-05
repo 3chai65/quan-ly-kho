@@ -33,7 +33,7 @@ tồn kho, thống kê doanh thu 12 tháng.
 | `migrations/0001_init.sql` | Schema D1 ban đầu (products, transactions, prescriptions, prescription_items, ledger, app_meta) |
 | `migrations/0002_drop_ledger.sql` | Xóa bảng `ledger` (gỡ tính năng Sổ Thu Chi) |
 | `scripts/backup-to-sql.mjs` | Import backup JSON vào D1 |
-| `tests/worker.test.mjs` | Test hồi quy logic tiền/tồn kho/đồng bộ/API (`node --test tests/`) |
+| `tests/worker.test.mjs` | Test hồi quy logic tiền/tồn kho/đồng bộ/API (`node --test "tests/**/*.test.mjs"`) |
 | `kho-backup/` | Backup JSON — **không được commit** (đã gitignore) |
 | `CHANGELOG.md` | Lịch sử thay đổi (Keep a Changelog + SemVer) |
 
@@ -45,7 +45,7 @@ npx wrangler deploy   # deploy tay
 # hoặc: push lên main → Actions tự deploy
 
 npx wrangler secret put APP_TOKEN   # bắt buộc 1 lần trước khi dùng bản có token
-node --test tests/                  # chạy test trước khi deploy
+node --test "tests/**/*.test.mjs"   # chạy test trước khi deploy
 ```
 
 Không có `package.json`; không cần `npm install`. `worker.js` import `src/page.js` — Wrangler
