@@ -18,9 +18,12 @@ tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 - Sửa giao dịch nhập **Thăng Ma** (01/11/2026) bị gõ nhầm **40 kg → 4 kg** qua chức năng
   "Sửa giao dịch" của app (giá giữ 240k/kg, thành tiền 9.600 → 960): tồn kho, lịch sử,
   thống kê tháng tự đồng bộ; verify bằng D1 (`stock=4`) và màn **Đối chiếu tồn kho**
-  (Thăng Ma không còn lệch). Đối chiếu phát hiện thêm 5 vị lệch nhỏ (Tri Mẫu −2,5 kg;
-  Đại Táo +0,03; Hồng Hoa +0,01; Sinh Địa +0,01; Xuyên Khung Thái +0,01) — **chưa tự sửa**,
-  chờ quyết định của chủ shop.
+  (Thăng Ma không còn lệch).
+- Xóa giao dịch **nhập kép Tri Mẫu** (31/10/2026): chỉ nhập 1 lần nhưng ghi 2 dòng
+  2,5 kg (@ 17k và @ 170k) — xóa dòng @ 17k (42,5k), giữ dòng @ 170k (425k); sau đó
+  chỉnh tồn theo lịch sử trong màn Đối chiếu → **Tri Mẫu tồn = 2,44 kg, khớp thực tế**.
+  Đối chiếu hiện còn 4 vị lệch nhỏ (Đại Táo +0,03; Hồng Hoa +0,01; Sinh Địa +0,01;
+  Xuyên Khung Thái +0,01) — **chưa tự sửa**, chờ quyết định của chủ shop.
 
 ## [1.11.0] - 2026-11-05
 
