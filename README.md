@@ -20,7 +20,7 @@
 - Mỗi cài đặt có **Database D1 riêng** (`database_id = db9f5180-0f90-4f0e-bba9-2141f1c52fe6`)
 - Dữ liệu giữa các user **không bị mix lẫn nhau**
 - App **public** nghĩa là không có bước đăng nhập/run vào, không có xác thực mật khẩu
-- Để xem/app dụng, truy cập qua domain của bạn (`quan-ly-kho.yellows-voz.workers.dev` hoặc domain cá nhân)
+- Dữ liệu lưu trực tiếp trong Cloudflare D1 cá nhân, không cần domain công khai để truy cập
 
 ---
 
