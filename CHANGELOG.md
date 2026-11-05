@@ -5,6 +5,23 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.12.0] - 2026-11-05
+
+### Thay đổi
+
+- **Danh sách tồn kho bỏ cột "Trị giá"**; thứ tự cột hiện là **Tên – Đã bán – Tồn kho – Giá nhập**
+  (đúng yêu cầu); cột **Đã bán** hiển thị tổng kg đã bán của vị đó (cùng nguồn với mục
+  sắp xếp "Bán chạy nhất"). Bỏ luôn 2 lựa chọn sắp xếp theo trị giá trong dropdown.
+
+### Dữ liệu
+
+- Sửa giao dịch nhập **Thăng Ma** (01/11/2026) bị gõ nhầm **40 kg → 4 kg** qua chức năng
+  "Sửa giao dịch" của app (giá giữ 240k/kg, thành tiền 9.600 → 960): tồn kho, lịch sử,
+  thống kê tháng tự đồng bộ; verify bằng D1 (`stock=4`) và màn **Đối chiếu tồn kho**
+  (Thăng Ma không còn lệch). Đối chiếu phát hiện thêm 5 vị lệch nhỏ (Tri Mẫu −2,5 kg;
+  Đại Táo +0,03; Hồng Hoa +0,01; Sinh Địa +0,01; Xuyên Khung Thái +0,01) — **chưa tự sửa**,
+  chờ quyết định của chủ shop.
+
 ## [1.11.0] - 2026-11-05
 
 ### Thêm mới

@@ -76,7 +76,7 @@ Trang HTML **không bao giờ** nhúng dữ liệu cho người chưa đăng nh�
 ## Quy ước làm việc
 
 - D1 là source of truth; mọi thay đổi đều đọc/ghi qua `/api/state`.
-- Danh sách tồn kho mặc định sắp xếp theo **Bán chạy nhất** (tổng kg đã bán, `BAN`); các cách sắp xếp khác trong dropdown vẫn dùng được.
+- Danh sách tồn kho mặc định sắp xếp theo **Bán chạy nhất** (tổng kg đã bán, `BAN`); các cách sắp xếp khác trong dropdown vẫn dùng được. Cột hiển thị: **Tên – Đã bán – Tồn kho – Giá nhập** (không còn Trị giá).
 - Sửa logic tiền/tồn kho = sửa vùng nhạy cảm nhất của app — test kỹ trên dev trước khi deploy.
 - Mỗi thay đổi đáng kể → ghi vào `CHANGELOG.md`.
 - README này là context chung cho người và AI: giữ ngắn, chỉ ghi thông tin còn đúng;

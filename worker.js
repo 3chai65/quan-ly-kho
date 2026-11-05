@@ -800,8 +800,6 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
               <option value="name_asc">Tên (A → Z)</option>
               <option value="stock_desc">Số lượng (nhiều → ít)</option>
               <option value="stock_asc">Số lượng (ít → nhiều)</option>
-              <option value="total_desc">Trị giá (cao → thấp)</option>
-              <option value="total_asc">Trị giá (thấp → cao)</option>
             </select>
           </div>
         </div>
@@ -815,10 +813,10 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
           <table class="inv">
             <caption class="sr">Tồn kho hiện tại</caption>
             <thead><tr>
-              <th scope="col">Vị thuốc</th>
-              <th scope="col">Tồn</th>
+              <th scope="col">Tên</th>
+              <th scope="col">Đã bán</th>
+              <th scope="col">Tồn kho</th>
               <th scope="col">Giá nhập</th>
-              <th scope="col">Trị giá</th>
               <th scope="col" class="c-del"><span class="sr">Thao tác</span></th>
             </tr></thead>
             <tbody id="invBody"></tbody>
@@ -2277,8 +2275,6 @@ function renderInventory(){
     if (sortBy === 'sold_desc') return ((sales[b.id] || 0) - (sales[a.id] || 0)) || sortByName(a, b);
     if (sortBy === 'stock_desc') return num(b.stock) - num(a.stock);
     if (sortBy === 'stock_asc') return num(a.stock) - num(b.stock);
-    if (sortBy === 'total_desc') return num(b.stock) * num(b.costPrice) - num(a.stock) * num(a.costPrice);
-    if (sortBy === 'total_asc') return num(a.stock) * num(a.costPrice) - num(b.stock) * num(b.costPrice);
     return sortByName(a, b);
   });
 
@@ -2299,15 +2295,15 @@ function renderInventory(){
     var tr = el('tr');
     tr.className = 'is-row';
     tr.appendChild(el('td', 'b', p.name));
+    var cSold = el('td', 'num muted', fmtQty(sales[p.id] || 0));
+    cSold.setAttribute('data-label', 'Đã bán');
+    tr.appendChild(cSold);
     var cStock = el('td', 'num', fmtQty(p.stock));
-    cStock.setAttribute('data-label', 'Tồn');
+    cStock.setAttribute('data-label', 'Tồn kho');
     tr.appendChild(cStock);
     var cCost = el('td', 'num muted', fmtUnitPrice(p.costPrice));
     cCost.setAttribute('data-label', 'Giá nhập');
     tr.appendChild(cCost);
-    var cVal = el('td', 'num b txt-brand', fmtMoney(num(p.stock) * num(p.costPrice)));
-    cVal.setAttribute('data-label', 'Trị giá');
-    tr.appendChild(cVal);
 
     var tdA = el('td', 'c-del');
     tdA.appendChild(rowMenu([
