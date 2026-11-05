@@ -5,6 +5,15 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.13.1] - 2026-11-05
+
+### Docs
+
+- README thêm mục **Tinh thần dự án (đặt từ đầu)**: PageSpeed/Lighthouse ở mức cao nhất
+  (A11y / Best-Practices / SEO = 100), không tài nguyên ngoài, ít request, ngữ nghĩa
+  HTML/ARIA, dữ liệu tiền/tồn kho qua luồng app, backup thường xuyên. Làm sổ tay chung
+  cho người và cho AI khi sửa code sau này.
+
 ## [1.13.0] - 2026-11-05
 
 ### Bỏ tính năng Sổ Thu Chi

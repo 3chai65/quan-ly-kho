@@ -3,6 +3,18 @@
 App quản lý kho dược liệu cá nhân (1 người dùng): nhập hàng, bán lẻ, đơn thuốc chén,
 tồn kho, thống kê doanh thu 12 tháng.
 
+## Tinh thần dự án (đặt từ đầu)
+
+- **PageSpeed/Lighthouse cao nhất có thể**: không tài nguyên ngoài (font/CDN/analytics),
+  ít request nhất có thể, mục tiêu Lighthouse A11y / Best-Practices / SEO = **100**.
+- **Gọn nhẹ và đơn giản**: số đường ngắn nhất, ít file nhất; không framework, không build step.
+- **Tiền bạc và tồn kho phải chuẩn xác**: mọi thay đổi dữ liệu đi qua luồng của chính
+  app (không SQL tường minh từ ngoài), backup thường xuyên.
+- **Ít phụ thuộc**: càng ít thứ chạy ngoài/chạy ngầm càng tốt — chính nhờ vậy mà trang
+  nhanh và PageSpeed đẹp.
+- **CSS/JS/HTML ngữ nghĩa**: mọi tương tác có nhãn/aria đúng chuẩn để A11y đạt 100.
+
+
 ## Stack
 
 - **Cloudflare Workers** — toàn bộ app nằm trong `worker.js` (HTML/CSS/JS inline, không build step)
