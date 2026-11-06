@@ -5,6 +5,19 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.1.0] - 2026-11-06
+
+### Tự động sao lưu mỗi ngày
+
+- Server tự tạo **1 bản backup file `.db` mỗi ngày** bằng SQLite `VACUUM INTO`
+  (nhất quán, không cần dừng app).
+- Lưu vào `data/backups/backup-YYYY-MM-DD.db` (trên ổ cứng PC), **giữ 30 bản**
+  gần nhất, tự xóa bản cũ hơn.
+- Chạy khi khởi động, sau mỗi lần ghi dữ liệu, và kiểm tra mỗi giờ (kịp chụp khi
+  app chạy qua nửa đêm).
+- Thêm API `GET /api/backups` liệt kê các bản backup hiện có.
+- Cấu hình qua biến môi trường: `BACKUP_DIR`, `BACKUP_KEEP_DAYS`.
+
 ## [2.0.1] - 2026-11-06
 
 ### Thay đổi hiển thị & lưu trữ tiền — làm tròn về số nguyên

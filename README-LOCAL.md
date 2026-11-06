@@ -21,8 +21,23 @@ Mở trên điện thoại: **http://<IP-máy-tính>:8787**
 
 ## Dữ liệu nằm ở đâu
 - File SQLite: `G:\Quản Lý Kho-local\data\app.db`
-- **Backup:** dừng container rồi copy file `data\app.db` (và `app.db-wal`,
-  `app.db-shm` nếu có) ra nơi an toàn. Hoặc dùng nút "Sao lưu" JSON trong app.
+
+## Tự động sao lưu (mỗi ngày)
+- Server tự tạo **1 bản backup/ngày** vào `G:\Quản Lý Kho-local\data\backups\`,
+  tên `backup-YYYY-MM-DD.db`, giữ **30 bản** gần nhất (bản cũ tự xóa).
+- Xem danh sách backup: mở `http://localhost:8787/api/backups`.
+- **Khôi phục nhanh:** dừng container, copy file backup đè lên `app.db`, khởi động lại:
+  ```powershell
+  cd "G:\Quản Lý Kho-local"
+  docker compose stop
+  Copy-Item "data\backups\backup-2026-11-06.db" "data\app.db" -Force
+  Remove-Item "data\app.db-wal","data\app.db-shm" -ErrorAction SilentlyContinue
+  docker compose start
+  ```
+- **Backup offsite:** trỏ `BACKUP_DIR` sang thư mục Google Drive (sửa
+  `docker-compose.yml`).
+- **Backup thủ công:** nút "Sao lưu" trong app tải file JSON theo trình duyệt
+  của từng thiết bị; cách copy `app.db`/`backups` trên mới là backup thật trên PC.
 
 ## Nạp dữ liệu từ file backup JSON
 

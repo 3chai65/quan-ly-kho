@@ -30,6 +30,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8787;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'app.db');
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(DATA_DIR, 'backups');
+const BACKUP_KEEP_DAYS = Number(process.env.BACKUP_KEEP_DAYS) || 30;
 const MAX_BODY = 4 * 1024 * 1024;
 const MAX_INLINE = 200 * 1024;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -316,6 +318,52 @@ function writeState(state) {
   return now;
 }
 
+/* ============================ TỰ ĐỘNG SAO LƯU ============================ */
+/*
+ * Mỗi ngày tạo 1 bản backup file .db bằng SQLite VACUUM INTO (an toàn khi đang
+ * ghi, không cần dừng app). Giữ 30 bản gần nhất, tự xóa bản cũ hơn.
+ * Tên file: backup-YYYY-MM-DD.db
+ */
+
+function todayStamp() {
+  const d = new Date();
+  const p = n => (n < 10 ? '0' + n : '' + n);
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+function runDailyBackup(force) {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const file = path.join(BACKUP_DIR, 'backup-' + todayStamp() + '.db');
+    if (fs.existsSync(file)) {
+      if (force) fs.unlinkSync(file);
+    }
+    if (!fs.existsSync(file)) {
+      // VACUUM INTO tạo bản sao nhất quán, không bị ảnh hưởng bởi ghi đồng thời.
+      db.prepare('VACUUM INTO ?').run(file);
+      console.log('[backup] Đã sao lưu: ' + file);
+    }
+  } catch (err) {
+    console.error('[backup] Lỗi sao lưu:', err && err.message ? err.message : err);
+  }
+  pruneBackups();
+}
+
+function pruneBackups() {
+  try {
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(n => /^backup-\d{4}-\d{2}-\d{2}\.db$/.test(n))
+      .sort();
+    while (files.length > BACKUP_KEEP_DAYS) {
+      const old = files.shift();
+      fs.unlinkSync(path.join(BACKUP_DIR, old));
+      console.log('[backup] Đã xóa bản cũ: ' + old);
+    }
+  } catch (err) {
+    console.error('[backup] Lỗi dọn bản cũ:', err && err.message ? err.message : err);
+  }
+}
+
 /* ============================ BOOT JSON ============================ */
 
 function bootJson(data) {
@@ -375,6 +423,7 @@ app.put('/api/state', (req, res) => {
       }
     }
     const updatedAt = writeState(checked.state);
+    runDailyBackup(false); // tạo bản backup ngày (nếu chưa có)
     res.json({ success: true, updatedAt, warnings: checked.warnings.length ? checked.warnings : undefined });
   } catch (err) {
     console.error('/api/state PUT', err);
@@ -409,9 +458,33 @@ app.get('/', (req, res) => {
   res.send(html);
 });
 
+app.get('/api/backups', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(n => /^backup-\d{4}-\d{2}-\d{2}\.db$/.test(n))
+      .sort()
+      .reverse()
+      .map(n => {
+        const st = fs.statSync(path.join(BACKUP_DIR, n));
+        return { name: n, size: st.size, modified: st.mtime.toISOString() };
+      });
+    res.json({ success: true, dir: BACKUP_DIR, keepDays: BACKUP_KEEP_DAYS, count: files.length, backups: files });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Không đọc được danh sách backup' });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log('Quản Lý Kho (local) đang chạy:');
   console.log('  PC    : http://localhost:' + PORT);
   console.log('  Mobile: http://<IP-máy-tính>:' + PORT);
   console.log('  DB    : ' + DB_FILE);
+  console.log('  Backup: ' + BACKUP_DIR + ' (giữ ' + BACKUP_KEEP_DAYS + ' ngày)');
+
+  // Sao lưu ngay khi khởi động (nếu hôm nay chưa có), rồi kiểm tra mỗi giờ
+  // để kịp chụp khi app chạy qua nửa đêm.
+  runDailyBackup(false);
+  setInterval(() => runDailyBackup(false), 60 * 60 * 1000);
 });
