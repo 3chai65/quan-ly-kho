@@ -15,7 +15,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # Test logic client (chạy trên host, không cần dependency ngoài).
+  test-client:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,15 +28,19 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run tests
-        run: node --test "tests/**/*.test.mjs"
+      - name: Run client tests
+        run: node --test tests/worker.test.mjs
 
-  docker-build:
+  # Build image rồi test server.js thật bên trong container.
+  test-server:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Build Docker image
         run: docker build -t quan-ly-kho-local:ci .
+
+      - name: Run server tests in container
+        run: docker run --rm -e DATA_DIR=/tmp/qlk-ci quan-ly-kho-local:ci npm test

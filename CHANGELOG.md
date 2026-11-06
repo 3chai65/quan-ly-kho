@@ -5,6 +5,22 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.3.0] - 2026-11-06
+
+### Kiểm thử & sửa lỗi P0 (theo đánh giá review)
+
+- **Test chạy trực tiếp `server.js`**: thêm `tests/server.test.mjs` (10 test) khởi
+  động server thật và kiểm tra qua HTTP — validate, conflict 409, làm tròn tiền,
+  tự động backup. Trước đây chỉ có test cho `worker.js` (bản Cloudflare cũ), nên
+  file đang chạy production không được test.
+- **Vá lỗi `X-Base-Updated` không phải số**: header `NaN` trước đây bị bỏ qua
+  kiểm tra conflict (ghi đè mù); nay trả **400**.
+- **Gỡ nút "Đăng xuất" chết**: `/logout` không còn tồn tại ở bản local (bỏ đăng
+  nhập), nút này trỏ tới 404.
+- **Docker**: COPY `tests/server.test.mjs` vào image; thêm `npm test` (server)
+  và `npm run test:client` (client).
+- **CI**: tách 2 job — test client trên host, test server bên trong container.
+
 ## [2.2.1] - 2026-11-06
 
 ### Bỏ cấu hình Claude Code cho code-review-graph

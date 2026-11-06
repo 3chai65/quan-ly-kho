@@ -393,7 +393,6 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
           </button>
         </div>
       </div>
-      <a class="btn btn--sm" href="/logout">Đăng xuất</a>
     </div>
   </div>
 </header>

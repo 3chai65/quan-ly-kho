@@ -415,11 +415,13 @@ app.put('/api/state', (req, res) => {
     const baseHdr = req.get('X-Base-Updated');
     if (baseHdr != null && req.get('X-Force') !== '1') {
       const baseNum = Number(baseHdr);
-      if (Number.isFinite(baseNum)) {
-        const current = getSourceUpdatedAt();
-        if (current > baseNum) {
-          return res.status(409).json({ success: false, conflict: true, updatedAt: current });
-        }
+      // Header không phải số hợp lệ → coi như xung đột (an toàn) thay vì bỏ qua kiểm tra.
+      if (!Number.isFinite(baseNum)) {
+        return res.status(400).json({ success: false, error: 'X-Base-Updated không hợp lệ' });
+      }
+      const current = getSourceUpdatedAt();
+      if (current > baseNum) {
+        return res.status(409).json({ success: false, conflict: true, updatedAt: current });
       }
     }
     const updatedAt = writeState(checked.state);

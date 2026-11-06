@@ -13,6 +13,7 @@ RUN npm install --omit=dev
 COPY server.js ./
 COPY src ./src
 COPY migrations ./migrations
+COPY tests/server.test.mjs ./tests/server.test.mjs
 
 ENV NODE_ENV=production
 ENV PORT=8787

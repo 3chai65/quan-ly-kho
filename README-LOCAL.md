@@ -63,6 +63,16 @@ $s = $req.GetRequestStream(); $s.Write($bytes, 0, $bytes.Length); $s.Close()
 Hoặc đơn giản hơn: mở app → **Sao lưu & khôi phục → Khôi phục từ file** trên
 chính giao diện web.
 
+## Chạy test
+```powershell
+# Test client (trên máy, chỉ cần Node):
+node --test tests/worker.test.mjs
+
+# Test server thật (cần better-sqlite3 → chạy trong container):
+docker run --rm -e DATA_DIR=/tmp/qlk quan-ly-kho:latest npm test
+# hoặc nếu chưa build: docker build -t quan-ly-kho:latest .  rồi chạy lệnh trên
+```
+
 ## Dừng / khởi động lại
 ```powershell
 docker compose stop      # dừng (giữ dữ liệu)
