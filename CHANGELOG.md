@@ -5,6 +5,15 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.2.1] - 2026-11-06
+
+### Bỏ cấu hình Claude Code cho code-review-graph
+
+- Gỡ `.mcp.json`, `.claude/` và pre-commit hook do code-review-graph cài — không
+  dùng với Claude Code. Giữ `CLAUDE.md` làm tài liệu kiến trúc.
+- Vẫn có thể dùng CLI `code-review-graph` thủ công khi cần (`build`, `update`,
+  `query`, `impact`, `architecture`).
+
 ## [2.2.0] - 2026-11-06
 
 ### Tích hợp code-review-graph (MCP)
