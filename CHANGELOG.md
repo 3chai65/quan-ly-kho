@@ -5,6 +5,32 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.0.0] - 2026-11-06
+
+### Kiến trúc — chuyển sang chạy local (Docker + SQLite)
+
+- **Bỏ Cloudflare Worker + D1**, thay bằng server Node (`server.js`) dùng
+  **Express + better-sqlite3** chạy trong Docker; dữ liệu là **file SQLite thật
+  trên ổ cứng** (`data/app.db`), dễ copy để backup.
+- Giữ **nguyên hợp đồng API** `GET/PUT /api/state` (kể cả `X-Base-Updated`,
+  `X-Force`, 409 conflict) và **toàn bộ logic tiền/tồn kho** trong `src/page.js`.
+- PC và điện thoại trong cùng mạng WiFi truy cập chung một nguồn dữ liệu qua
+  `http://<IP-máy-tính>:8787`; không cần internet.
+- Thêm `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `package.json`.
+- Cổng mặc định 8787, volume `./data:/data`.
+
+### Bỏ đăng nhập
+
+- Gỡ xác thực `APP_TOKEN` / cookie `qlk_token` / trang `/login` — bản local chỉ
+  chạy trong mạng nội bộ. `authFetch` (kiểm tra Bearer + redirect 401) trong
+  `src/page.js` được thay bằng `apiFetch` gọi thẳng API.
+
+### Ghi chú
+
+- `worker.js`, `wrangler.toml` và bộ test cũ được **giữ lại làm tham chiếu**;
+  27 test hiện có vẫn chạy và pass.
+- Hướng dẫn chạy cho người dùng nằm trong `README-LOCAL.md`.
+
 ## [1.14.2] - 2026-11-05
 
 ### Khôi phục & an toàn dữ liệu

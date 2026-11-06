@@ -18,11 +18,13 @@ tồn kho, thống kê doanh thu 12 tháng.
 
 ## Stack
 
-- **Cloudflare Workers** — `worker.js` giữ router/API; `src/page.js` giữ HTML/CSS/JS client
-  (vẫn nhúng inline khi trả trang). Import ESM được Wrangler tự bundle, **không cần build step**.
-- **Cloudflare D1** (SQLite) — nguồn dữ liệu chính; localStorage chỉ là cache tạm
-- **GitHub Actions** (`.github/workflows/deploy.yml`) — push lên `main` là tự deploy
-  (cần secret `CLOUDFLARE_API_TOKEN` trong repo)
+- **Bản hiện tại (local)**: server **Node + Express + better-sqlite3** chạy trong
+  **Docker**, dữ liệu là **file SQLite trên ổ cứng** (`data/app.db`). PC và điện
+  thoại trong cùng mạng WiFi dùng chung dữ liệu. Xem `README-LOCAL.md` để chạy.
+- **Bản cũ (Cloudflare, đã ngừng dùng)**: `worker.js` giữ router/API; `src/page.js`
+  giữ HTML/CSS/JS client (nhúng inline khi trả trang); **Cloudflare D1** làm nguồn
+  dữ liệu; **GitHub Actions** tự deploy khi push `main`. Các file này được giữ làm
+  tham chiếu, không còn là đường chạy chính.
 
 ## Cấu trúc
 

@@ -1,0 +1,9 @@
+node_modules
+data
+kho-backup
+.git
+.github
+*.log
+.claude
+.mcp.json
+CLAUDE.md

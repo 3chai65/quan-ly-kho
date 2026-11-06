@@ -3493,23 +3493,17 @@ function saveTxEdit(){
   closeTxEdit();
   commit('Đã cập nhật giao dịch');
 }
-/* ==== Xác thực: cookie đăng nhập HttpOnly (hoặc Bearer nếu có localStorage) ==== */
-function authFetch(url, opts){
+/* ==== Đồng bộ: bản local không có đăng nhập, gọi thẳng API ==== */
+function apiFetch(url, opts){
   var o = {};
   var src = opts || {};
   for (var k in src) o[k] = src[k];
   var h = {};
   var sh = src.headers || {};
   for (var k2 in sh) h[k2] = sh[k2];
-  var t = null;
-  try { t = localStorage.getItem('qlk_token'); } catch (e) {}
-  if (t) h['Authorization'] = 'Bearer ' + t;
   o.headers = h;
   o.cache = 'no-store';
-  return fetch(url, o).then(function(r){
-    if (r.status === 401) { location.href = '/login'; return null; }
-    return r;
-  });
+  return fetch(url, o);
 }
 /* ================= ĐỒNG BỘ D1 ================= */
 function cloudConflict(){
@@ -3525,7 +3519,7 @@ function pushState(manual, force){
   var sent = num(db.updatedAt);
   var headers = { 'Content-Type': 'application/json', 'X-Base-Updated': String(cloudBase) };
   if (force) headers['X-Force'] = '1';
-  return authFetch('/api/state', {
+  return apiFetch('/api/state', {
     method: 'PUT',
     headers: headers,
     body: JSON.stringify(db)
@@ -3568,7 +3562,7 @@ function pushState(manual, force){
   });
 }
 function pullState(manual, forceLatest){
-  return authFetch('/api/state?t=' + Date.now())
+  return apiFetch('/api/state?t=' + Date.now())
     .then(function(r){
       return r ? r.json() : null;
     })
