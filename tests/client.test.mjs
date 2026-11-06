@@ -47,11 +47,13 @@ globalThis.__test = {
   setBase: function(v){ cloudBase = dec(v); },
   getBase: function(){ return cloudBase; },
   saveLocal: saveLocal, readDirty: readDirty, readBase: readBase,
-  computeStats: computeStats, allocateRemedyAmounts: allocateRemedyAmounts,
+  computeStats: computeStats, allocateRemedyByCost: allocateRemedyByCost,
   backupBeforeRestore: backupBeforeRestore, downloadBackup: downloadBackup,
   pushState: pushState, pullState: pullState, cloudConflict: cloudConflict,
   autoRefresh: autoRefresh, busyEditing: busyEditing,
   setRetailItems: function(v){ retailItems = v; },
+  setRemedyItems: function(v){ remedyItems = v; },
+  setNhapList: function(v){ nhapList = v; },
   setActiveTag: function(tag){ doc.activeElement = tag ? { tagName: tag } : null; },
   setConflictOpen: function(v){ conflictOpen = !!v; },
   setSyncErrorShown: function(v){ syncErrorShown = !!v; }
@@ -272,21 +274,15 @@ test('mergeCandidates vẫn gộp các dòng bán rời không có cờ retail',
   assert.equal(list[0].items.length, 2);
 });
 
-test('allocateRemedyAmounts chia đủ tiền thành số nguyên, dòng cuối nhận phần dư', () => {
-  const three = app.allocateRemedyAmounts(100, [{ g: 1 }, { g: 1 }, { g: 1 }]);
-  assert.equal(three.length, 3);
-  assert.equal(three.reduce((a, b) => a + b, 0), 100);
-  assert.ok(three.every(Number.isInteger));
+test('allocateRemedyByCost: vốn cộng lãi chia đều, dòng cuối nhận phần dư', () => {
+  const sale = app.allocateRemedyByCost(200, [{ cost: 1 }, { cost: 3 }, { cost: 6 }]);
+  assert.deepEqual(sale, [64, 66, 70]);
+  assert.equal(sale.reduce((a, b) => a + b, 0), 200);
 
-  const uneven = app.allocateRemedyAmounts(800, [{ g: 3 }, { g: 5 }]);
-  assert.deepEqual(uneven, [300, 500]);
-
-  const odd = app.allocateRemedyAmounts(100, [{ g: 3 }, { g: 5 }, { g: 7 }, { g: 11 }]);
-  assert.equal(odd.reduce((a, b) => a + b, 0), 100);
-  assert.ok(odd.every(Number.isInteger));
-
-  assert.deepEqual(app.allocateRemedyAmounts(42.5, [{ g: 10 }]), [42.5]);
-  assert.equal(app.allocateRemedyAmounts(100, [{ g: 0 }, { g: 0 }]).reduce((a, b) => a + b, 0), 100);
+  assert.deepEqual(app.allocateRemedyByCost(100, [{ cost: 40 }]), [100]);
+  assert.deepEqual(app.allocateRemedyByCost(10, [{ cost: 4 }, { cost: 6 }]), [4, 6]);
+  assert.deepEqual(app.allocateRemedyByCost(10, [{ cost: 0 }, { cost: 0 }, { cost: 0 }]), [3, 3, 4]);
+  assert.deepEqual(app.allocateRemedyByCost(42.6, [{ cost: 10 }, { cost: 20 }]), [16, 27]);
 });
 
 /* ------------------------------------------------------------------ */
@@ -498,4 +494,37 @@ test('busyEditing: tạm hoãn làm mới khi có giỏ hàng bán lẻ chưa l�
   assert.equal(client.busyEditing(), true, 'có dòng trong giỏ hàng bán lẻ phải coi là đang bận');
   client.setRetailItems([]);
   assert.equal(client.busyEditing(), false, 'sau khi xóa giỏ hàng thì không còn bận');
+});
+
+test('busyEditing: tạm hoãn làm mới khi đang soạn đơn thuốc hoặc đơn nhập', () => {
+  const client = loadClient();
+  client.setActiveTag(null);
+  client.setRemedyItems([]);
+  client.setNhapList([]);
+  assert.equal(client.busyEditing(), false);
+  client.setRemedyItems([{ productId: 'p1', grams: 10 }]);
+  assert.equal(client.busyEditing(), true, 'đơn thuốc chén chưa lưu phải coi là đang bận');
+  client.setRemedyItems([]);
+  client.setNhapList([{ pid: 'p1', name: 'A', qty: 1, price: 10 }]);
+  assert.equal(client.busyEditing(), true, 'tờ ghi nhập chưa lưu phải coi là đang bận');
+  client.setNhapList([]);
+  assert.equal(client.busyEditing(), false);
+});
+
+test('autoRefresh: không ghi đè nếu máy bắt đầu sửa trong lúc đang tải', async () => {
+  const remote = { products: [{ id: 'p1', name: 'Server', stock: 9, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 500 };
+  let client;
+  const fetchStub = async () => {
+    client.setDirty(true);
+    client.getDb().products[0].name = 'VuaSua';
+    return { status: 200, json: async () => ({ success: true, data: remote }) };
+  };
+  client = loadClient({ fetch: fetchStub });
+  client.setDb({ products: [{ id: 'p1', name: 'DangXem', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 100 });
+  client.setBase(100);
+  client.setDirty(false);
+  client.setActiveTag(null);
+  await client.autoRefresh();
+  assert.equal(client.getDb().products[0].name, 'VuaSua', 'bản vừa sửa trên máy phải được giữ');
+  assert.equal(client.isDirty(), true);
 });

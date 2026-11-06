@@ -248,6 +248,32 @@ test('server.js: orderName không fallback thành oid; tự dọn oname === oid 
   assert.equal(impRefreshed.oname, undefined, 'readState phải tự dọn bỏ oname khi trùng với oid');
 });
 
+test('server.js: tiền lẻ còn trong DB được đọc thành số nguyên', async () => {
+  await put(emptyState({
+    products: [{ id: 'PLEG', name: 'TienLe', stock: 1, costPrice: 10 }],
+    transactions: [{ id: 'TLEG', date: '2026-11-06', type: 'BAN', productId: 'PLEG', qty: 1, price: 10, total: 10, cost: 4, unitPrice: 8, ts: 1 }],
+    prescriptions: [{ id: 'RLEG', name: 'Don le', items: [{ productId: 'PLEG', grams: 5 }], total: 8, thang: 1 }]
+  }), { 'X-Force': '1' });
+
+  const DB = (await import('better-sqlite3')).default;
+  const conn = new DB(path.join(dataDir, 'app.db'));
+  conn.prepare('UPDATE products SET cost_price_vnd = 42.6 WHERE id = ?').run('PLEG');
+  conn.prepare('UPDATE transactions SET price_vnd = 42.4, total_vnd = 99.5, cost_vnd = 10.49, unit_price_vnd = 8.5 WHERE id = ?').run('TLEG');
+  conn.prepare('UPDATE prescriptions SET total_vnd = 12.6 WHERE id = ?').run('RLEG');
+  conn.close();
+
+  const data = await getState();
+  const p = data.products.find(x => x.id === 'PLEG');
+  const t = data.transactions.find(x => x.id === 'TLEG');
+  const r = data.prescriptions.find(x => x.id === 'RLEG');
+  assert.equal(p.costPrice, 43);
+  assert.equal(t.price, 42);
+  assert.equal(t.total, 100);
+  assert.equal(t.cost, 10);
+  assert.equal(t.unitPrice, 9);
+  assert.equal(r.total, 13);
+});
+
 test('server.js: payload quá lớn trả JSON 413', async () => {
   const largeState = emptyState({
     products: Array.from({ length: 60000 }, (_, i) => ({

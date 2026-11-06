@@ -5,6 +5,34 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.6.3] - 2026-11-06
+
+### Chia tiền đơn thuốc chén theo vốn và lãi
+
+- **Chỉ đơn thuốc chén**, lúc bấm Bán đơn. Đơn bán lẻ vẫn để người dùng gõ thành
+  tiền từng dòng. Đơn đã bán không bị viết lại.
+- Khách vẫn trả **số thang × giá 1 thang**. Mỗi vị nhận vốn của chính nó
+  (giá nhập trên tồn kho × kg đã bán, kg = gram / 1000 × số thang) cộng một phần
+  lãi chia đều theo số vị. Dòng cuối nhận phần dư để tổng các dòng khớp đúng
+  thành tiền.
+- Nếu giá bán thấp hơn tổng vốn, đơn không được lưu.
+
+## [2.6.2] - 2026-11-06
+
+### Tiền nguyên và không làm mới đè lên bản đang soạn
+
+- **Sửa giá nhập lưu số nguyên**: ô sửa vị thuốc trước đây ghi `costPrice` bằng
+  `dec()` (có thể còn phần thập phân trên máy này) trong khi máy chủ làm tròn.
+  Hai thiết bị nhìn hai số khác nhau. Nay dùng `money()`.
+- **Đọc tiền từ SQLite luôn là số nguyên**: `price`, `total`, `cost`, `unitPrice`,
+  `costPrice` và tổng đơn thuốc được làm tròn khi đọc, kể cả dữ liệu cũ còn số lẻ.
+- **Tự làm mới không đè đơn đang soạn**: ngoài giỏ bán lẻ, còn tạm hoãn khi tờ ghi
+  đơn thuốc chén hoặc đơn nhập còn dòng chưa lưu. Nếu người dùng bắt đầu sửa trong
+  lúc bản mới đang tải về, bản trên máy được giữ.
+- **Đóng sạch khi request treo**: nhánh timeout 10 giây của SIGTERM/SIGINT cũng
+  checkpoint WAL trước khi thoát.
+- Thêm 2 test client (26/26) và 1 test server (14/14).
+
 ## [2.6.1] - 2026-11-06
 
 ### Tinh chỉnh dữ liệu đơn nhập & hoàn thiện môi trường local

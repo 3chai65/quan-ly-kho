@@ -1778,18 +1778,25 @@ function remedyThang(){
 function remedyGrand(){
   return money(remedyThang() * num(($('#remedyUnitPrice') || {}).value));
 }
-/* Hàm thuần: chia grand (số nguyên) cho các dòng theo gram; các phần đều là
-   số nguyên và dòng cuối nhận phần dư để tổng các dòng luôn bằng đúng grand. */
-function allocateRemedyAmounts(grand, items){
-  var list = items || [];
-  var totalG = list.reduce(function(a, it){ return a + num(it.g); }, 0);
+/* Hàm thuần cho đơn thuốc chén. grand là số khách trả (số nguyên).
+   lines[].cost là vốn từng vị, đã làm tròn: giá nhập × kg.
+   Thành tiền vị = vốn + phần lãi chia đều theo số vị.
+   Dòng cuối nhận phần dư để tổng các dòng đúng bằng grand. */
+function allocateRemedyByCost(grand, lines){
+  var list = lines || [];
+  var n = list.length;
+  if (!n) return [];
+  var g0 = money(grand);
+  var costs = list.map(function(l){ return money(l.cost); });
+  var totalCost = 0;
+  costs.forEach(function(c){ totalCost += c; });
+  var lai = g0 - totalCost;
+  var base = Math.floor(lai / n);
   var allocated = 0;
-  return list.map(function(it, idx){
-    var amount = idx === list.length - 1
-      ? grand - allocated
-      : Math.round(totalG > 0 ? grand * (num(it.g) / totalG) : 0);
-    allocated += amount;
-    return amount;
+  return costs.map(function(cost, idx){
+    var share = idx === n - 1 ? (lai - allocated) : base;
+    allocated += share;
+    return cost + share;
   });
 }
 function calcRemedy(){
@@ -2075,20 +2082,29 @@ function saveRemedy(){
       return;
     }
   }
+  var priced = items.map(function(it){
+    var p = findProduct(it.pid);
+    var kg = it.g / 1000 * thang;
+    return { it: it, p: p, kg: kg, cost: money(kg * num(p.costPrice)) };
+  });
+  var totalCost = 0;
+  priced.forEach(function(row){ totalCost += row.cost; });
+  if (grand < totalCost) { toast('Giá bán thấp hơn vốn của đơn', 'error'); return; }
   var oname = capWords(($('#remedyName') || {}).value) || 'Đơn thuốc lẻ';
   var oid = uid('OD');
   var ts = Date.now();
-  /* Chia tiền theo gram; dòng cuối nhận phần dư để tổng khớp tuyệt đối. */
-  var amounts = allocateRemedyAmounts(grand, items);
-  items.forEach(function(it, idx){
-    var p = findProduct(it.pid);
-    var kg = it.g / 1000 * thang;
+  /* Vốn từng vị + lãi chia đều theo số vị. Khách vẫn trả số thang × giá 1 thang. */
+  var amounts = allocateRemedyByCost(grand, priced);
+  priced.forEach(function(row, idx){
+    var it = row.it;
+    var p = row.p;
+    var kg = row.kg;
     p.stock = dec(p.stock - kg);
     var amount = amounts[idx];
     var tx = {
       id: uid('TX'), date: date, type: 'BAN', productId: it.pid,
       qty: dec(kg), price: kg > 0 ? money(amount / kg) : 0,
-      total: amount, cost: money(kg * num(p.costPrice)),
+      total: amount, cost: row.cost,
       rx: true, g: dec(it.g), thang: thang, unitPrice: thang > 0 ? money(grand / thang) : 0,
       ts: ts
     };
@@ -3347,7 +3363,7 @@ function saveEdit(){
   var d = dupName(name, id);
   if (d) { toast('Đã có "' + d.name + '" trong kho', 'error'); return; }
   p.name = name;
-  p.costPrice = dec(price);
+  p.costPrice = money(price);
   closeEdit();
   commit('Đã cập nhật vị thuốc');
 }
@@ -3610,6 +3626,8 @@ function busyEditing(){
   var dlgs = doc.querySelectorAll ? doc.querySelectorAll('dialog[open]') : null;
   if (dlgs && dlgs.length) return true;
   if (retailItems && retailItems.length) return true;
+  if (remedyItems && remedyItems.length) return true;
+  if (nhapList && nhapList.length) return true;
   return false;
 }
 function autoRefresh(){
@@ -3619,6 +3637,9 @@ function autoRefresh(){
     .then(function(r){ return r ? r.json() : null; })
     .then(function(d){
       refreshing = false;
+      /* Trong lúc chờ máy chủ, người dùng có thể bắt đầu sửa hoặc mở giỏ hàng.
+         Không ghi đè bản đang làm. */
+      if (dirty || conflictOpen || busyEditing()) return false;
       var server = d && d.success ? sanitize(d.data) : null;
       if (!server) return false;
       if (num(server.updatedAt) > num(cloudBase)) {

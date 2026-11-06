@@ -145,14 +145,14 @@ function readState() {
   }
 
   return {
-    products: products.map(p => ({ id: String(p.id), name: String(p.name), stock: decNum(p.stock), costPrice: decNum(p.costPrice) })),
+    products: products.map(p => ({ id: String(p.id), name: String(p.name), stock: decNum(p.stock), costPrice: money(p.costPrice) })),
     transactions: transactions.map(t => {
       const tx = {
         id: String(t.id), date: String(t.date), type: t.type === 'NHAP' ? 'NHAP' : 'BAN',
-        productId: String(t.productId), qty: decNum(t.qty), price: decNum(t.price), total: decNum(t.total),
-        cost: decNullable(t.cost), oid: t.oid == null ? undefined : String(t.oid), oname: t.oname == null ? undefined : String(t.oname),
+        productId: String(t.productId), qty: decNum(t.qty), price: money(t.price), total: money(t.total),
+        cost: moneyNullable(t.cost), oid: t.oid == null ? undefined : String(t.oid), oname: t.oname == null ? undefined : String(t.oname),
         retail: !!Number(t.retail), rx: !!Number(t.rx), g: decNullable(t.g), thang: decNullable(t.thang),
-        unitPrice: decNullable(t.unitPrice), ts: decNullable(t.ts)
+        unitPrice: moneyNullable(t.unitPrice), ts: decNullable(t.ts)
       };
       if (tx.cost == null) delete tx.cost;
       if (tx.oid == null) delete tx.oid;
@@ -167,7 +167,7 @@ function readState() {
     }),
     prescriptions: prescriptions.map(r => ({
       id: String(r.id), name: String(r.name), items: itemsByPrescription.get(r.id) || [],
-      total: decNum(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt)
+      total: money(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt)
     })),
     updatedAt: getSourceUpdatedAt()
   };
@@ -526,7 +526,13 @@ function shutdown(signal) {
     process.exit(0);
   });
   // Nếu còn request treo, thoát cưỡng bức sau 10s.
-  setTimeout(() => process.exit(0), 10000).unref();
+  setTimeout(() => {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.close();
+    } catch (e) { /* đã đóng hoặc đang đóng */ }
+    process.exit(0);
+  }, 10000).unref();
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));

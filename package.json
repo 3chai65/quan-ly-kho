@@ -1,6 +1,6 @@
 {
   "name": "quan-ly-kho-local",
-  "version": "2.6.1",
+  "version": "2.6.3",
   "private": true,
   "type": "module",
   "description": "Quản Lý Kho — bản chạy local (Docker + SQLite), thay thế Cloudflare Worker/D1",

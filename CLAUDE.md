@@ -13,4 +13,4 @@ better-sqlite3) chạy trong Docker, dữ liệu là file SQLite trên ổ cứn
 
 ## Vùng nhạy cảm
 Sửa xong phải chạy test: logic tiền, tồn kho, đồng bộ
-(`sanitize`, `validateState`, `allocateRemedyAmounts`, `pushState`/`pullState`).
+(`sanitize`, `validateState`, `allocateRemedyByCost`, `pushState`/`pullState`).
