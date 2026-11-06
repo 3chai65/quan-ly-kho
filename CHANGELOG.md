@@ -5,6 +5,21 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.4.0] - 2026-11-06
+
+### Dọn dẹp repo (theo đánh giá review)
+
+- **Xóa `wrangler.toml`** — chứa `database_id` và KV id thật, không còn dùng.
+- **Xóa file legacy Cloudflare**: `worker.js`, `migrations/`, `scripts/backup-to-sql.mjs`.
+- **Đổi tên** `tests/worker.test.mjs` → `tests/client.test.mjs` (chỉ còn test client;
+  các test Cloudflare đã có `tests/server.test.mjs` tương đương).
+- **Gỡ placeholder `%%NONCE%%`** khỏi `page.js` và `server.js` (CSP dùng `unsafe-inline`).
+- **`package-lock.json`** được commit; `Dockerfile` dùng `npm ci` để build tái lập.
+- **`package.json`**: version → `2.3.0`, thêm `engines.node >= 22`.
+- **`docker-compose.yml`**: thêm `TZ=Asia/Ho_Chi_Minh` (tên backup đúng ngày VN).
+- **`README.md`** viết lại cho bản local (bỏ hướng dẫn Cloudflare/D1/Time Travel).
+- **`.gitignore`**: bỏ `.wrangler/`, `.dev.vars`.
+
 ## [2.3.0] - 2026-11-06
 
 ### Kiểm thử & sửa lỗi P0 (theo đánh giá review)
