@@ -38,8 +38,7 @@ Máy tính (máy chủ)                          Điện thoại / PC khác (cù
 |---|---|
 | `server.js` | Server: API `/api/state`, đọc/ghi SQLite, lắp trang, tự động backup |
 | `src/page.js` | `PAGE`: toàn bộ HTML + CSS + JS client (nhúng inline) |
-| `migrations/` | Schema SQLite tham khảo (server tự tạo bảng bằng `CREATE TABLE IF NOT EXISTS`) |
-| `tests/worker.test.mjs` | Test logic client (tiền, tồn kho, đồng bộ) — chạy trên host |
+| `tests/client.test.mjs` | Test logic client (tiền, tồn kho, đồng bộ) — chạy trên host |
 | `tests/server.test.mjs` | Test `server.js` thật qua HTTP — chạy trong Docker |
 | `Dockerfile`, `docker-compose.yml` | Đóng gói và chạy server |
 | `data/` | Dữ liệu SQLite + backup — **không commit** (gitignore) |
@@ -64,7 +63,7 @@ Xem `README-LOCAL.md` để biết chi tiết (backup, khôi phục, nạp dữ 
 ## Chạy test
 
 ```powershell
-node --test tests/worker.test.mjs                 # test client (trên máy)
+node --test tests/client.test.mjs                 # test client (trên máy)
 docker run --rm -e DATA_DIR=/tmp/qlk quan-ly-kho:latest npm test   # test server (trong Docker)
 ```
 

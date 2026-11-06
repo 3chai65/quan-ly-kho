@@ -11,7 +11,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test tests/server.test.mjs",
-    "test:client": "node --test tests/worker.test.mjs"
+    "test:client": "node --test tests/client.test.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",

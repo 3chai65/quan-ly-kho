@@ -12,7 +12,6 @@ RUN npm ci --omit=dev
 
 COPY server.js ./
 COPY src ./src
-COPY migrations ./migrations
 COPY tests/server.test.mjs ./tests/server.test.mjs
 
 ENV NODE_ENV=production

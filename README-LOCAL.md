@@ -66,7 +66,7 @@ chính giao diện web.
 ## Chạy test
 ```powershell
 # Test client (trên máy, chỉ cần Node):
-node --test tests/worker.test.mjs
+node --test tests/client.test.mjs
 
 # Test server thật (cần better-sqlite3 → chạy trong container):
 docker run --rm -e DATA_DIR=/tmp/qlk quan-ly-kho:latest npm test

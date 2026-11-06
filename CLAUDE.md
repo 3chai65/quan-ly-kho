@@ -8,9 +8,8 @@ better-sqlite3) chạy trong Docker, dữ liệu là file SQLite trên ổ cứn
 - `server.js` — Express + better-sqlite3, thay Cloudflare Worker. Giữ hợp đồng
   API `GET/PUT /api/state`. Tự động backup mỗi ngày (`VACUUM INTO`).
 - `src/page.js` — toàn bộ HTML + CSS + JS client (nhúng inline).
-- `migrations/` — schema SQLite.
-- `worker.js`, `wrangler.toml` — bản Cloudflare cũ, giữ làm tham chiếu.
-- `tests/worker.test.mjs` — test hồi quy (`node --test "tests/**/*.test.mjs"`).
+- `tests/client.test.mjs` — test logic client (tiền, tồn kho, đồng bộ), chạy trên máy.
+- `tests/server.test.mjs` — test `server.js` thật qua HTTP, chạy trong Docker.
 
 ## Vùng nhạy cảm
 Sửa xong phải chạy test: logic tiền, tồn kho, đồng bộ

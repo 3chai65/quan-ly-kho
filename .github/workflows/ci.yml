@@ -29,7 +29,7 @@ jobs:
           node-version: 22
 
       - name: Run client tests
-        run: node --test tests/worker.test.mjs
+        run: node --test tests/client.test.mjs
 
   # Build image rồi test server.js thật bên trong container.
   test-server:
