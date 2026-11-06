@@ -3594,6 +3594,47 @@ function pullState(manual, forceLatest){
     })
     .catch(function(){ if (manual) toast('Không tải được dữ liệu', 'error'); return false; });
 }
+/* Tự làm mới: chỉ tải khi server có bản mới hơn và máy không có thay đổi
+   chưa gửi. Không hiện toast, không render nếu dữ liệu không đổi. */
+var refreshing = false;
+/* Đang gõ trong ô nhập hoặc đang mở hộp thoại sửa: tạm hoãn để không
+   làm mất nội dung người dùng đang nhập. Sẽ tự làm mới ở nhịp sau. */
+function busyEditing(){
+  var ae = doc.activeElement;
+  if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(String(ae.tagName || ''))) return true;
+  var dlgs = doc.querySelectorAll ? doc.querySelectorAll('dialog[open]') : null;
+  return !!(dlgs && dlgs.length);
+}
+function autoRefresh(){
+  if (refreshing || dirty || conflictOpen || doc.hidden || busyEditing()) return Promise.resolve(false);
+  refreshing = true;
+  return apiFetch('/api/state?t=' + Date.now())
+    .then(function(r){ return r ? r.json() : null; })
+    .then(function(d){
+      refreshing = false;
+      var server = d && d.success ? sanitize(d.data) : null;
+      if (!server) return false;
+      if (num(server.updatedAt) > num(cloudBase)) {
+        cloudBase = num(server.updatedAt);
+        db = server;
+        dirty = false;
+        saveLocal();
+        renderAll();
+        if (orderCur) renderOrder();
+        toast('Đã cập nhật dữ liệu mới từ thiết bị khác');
+        return true;
+      }
+      return false;
+    })
+    .catch(function(){ refreshing = false; return false; });
+}
+function startAutoRefresh(){
+  setInterval(autoRefresh, 15000);                      // định kỳ 15s
+  doc.addEventListener('visibilitychange', function(){  // quay lại tab
+    if (!doc.hidden) autoRefresh();
+  });
+  window.addEventListener('focus', autoRefresh);        // cửa sổ được focus
+}
 
 /* ================= SAO LƯU / KHÔI PHỤC ================= */
 var BAK_LAST = 'kho_backup_last_v1';
@@ -4044,6 +4085,7 @@ function init(){
   } else if (window.__NEED_FETCH__ || !remote) {
     pullState(false, true);
   }
+  startAutoRefresh();
 
   var firstUse = function(){
     doc.removeEventListener('pointerdown', firstUse);

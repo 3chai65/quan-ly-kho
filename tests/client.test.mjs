@@ -50,6 +50,8 @@ globalThis.__test = {
   computeStats: computeStats, allocateRemedyAmounts: allocateRemedyAmounts,
   backupBeforeRestore: backupBeforeRestore, downloadBackup: downloadBackup,
   pushState: pushState, pullState: pullState, cloudConflict: cloudConflict,
+  autoRefresh: autoRefresh, busyEditing: busyEditing,
+  setActiveTag: function(tag){ doc.activeElement = tag ? { tagName: tag } : null; },
   setConflictOpen: function(v){ conflictOpen = !!v; },
   setSyncErrorShown: function(v){ syncErrorShown = !!v; }
 };
@@ -404,4 +406,70 @@ test('pullState khi dirty không ghi đè local, đẩy bản local lên', async
   await client.pullState(true, false);
   assert.equal(client.getDb().products[0].name, 'Local');
   assert.deepEqual(calls, ['GET', 'PUT']);
+});
+
+/* ------------------------------------------------------------------ */
+/* Tự làm mới giữa các thiết bị (autoRefresh)                         */
+/* ------------------------------------------------------------------ */
+
+test('autoRefresh: tải bản server mới hơn khi máy không có thay đổi', async () => {
+  const remote = { products: [{ id: 'p1', name: 'Moi', stock: 9, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 500 };
+  const fetchStub = async () => ({ status: 200, json: async () => ({ success: true, data: remote }) });
+  const client = loadClient({ fetch: fetchStub });
+  client.setDb({ products: [{ id: 'p1', name: 'Cu', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 100 });
+  client.setBase(100);
+  client.setDirty(false);
+  await client.autoRefresh();
+  assert.equal(client.getDb().products[0].name, 'Moi');
+  assert.equal(client.getBase(), 500);
+});
+
+test('autoRefresh: KHÔNG ghi đè khi máy đang có thay đổi chưa gửi', async () => {
+  const remote = { products: [{ id: 'p1', name: 'Moi', stock: 9, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 500 };
+  const fetchStub = async () => ({ status: 200, json: async () => ({ success: true, data: remote }) });
+  const client = loadClient({ fetch: fetchStub });
+  client.setDb({ products: [{ id: 'p1', name: 'ChuaGui', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 100 });
+  client.setBase(100);
+  client.setDirty(true);
+  await client.autoRefresh();
+  assert.equal(client.getDb().products[0].name, 'ChuaGui', 'phải giữ bản local khi đang dirty');
+});
+
+test('autoRefresh: không render lại khi server không có gì mới', async () => {
+  let renderCalls = 0;
+  const remote = { products: [], transactions: [], prescriptions: [], updatedAt: 100 };
+  const fetchStub = async () => ({ status: 200, json: async () => ({ success: true, data: remote }) });
+  const client = loadClient({ fetch: fetchStub });
+  client.setDb({ products: [], transactions: [], prescriptions: [], updatedAt: 100 });
+  client.setBase(100);
+  client.setDirty(false);
+  await client.autoRefresh();
+  assert.equal(client.getBase(), 100, 'base không đổi khi server bằng nhau');
+});
+
+test('busyEditing: nhận biết ô nhập và hộp thoại đang mở', () => {
+  const client = loadClient();
+  client.setActiveTag(null);
+  assert.equal(client.busyEditing(), false, 'không focus thì không bận');
+  ['INPUT', 'TEXTAREA', 'SELECT'].forEach(tag => {
+    client.setActiveTag(tag);
+    assert.equal(client.busyEditing(), true, tag + ' phải coi là đang bận');
+  });
+  client.setActiveTag('BUTTON');
+  assert.equal(client.busyEditing(), false, 'nút bấm không chặn làm mới');
+});
+
+test('autoRefresh: KHÔNG tải khi đang gõ trong ô nhập', async () => {
+  let calls = 0;
+  const remote = { products: [{ id: 'p1', name: 'Moi', stock: 9, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 500 };
+  const fetchStub = async () => { calls++; return { status: 200, json: async () => ({ success: true, data: remote }) }; };
+  const client = loadClient({ fetch: fetchStub });
+  client.setDb({ products: [{ id: 'p1', name: 'DangNhap', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 100 });
+  client.setBase(100);
+  client.setDirty(false);
+  client.setActiveTag('INPUT');
+  await client.autoRefresh();
+  client.setActiveTag(null);
+  assert.equal(calls, 0, 'không được gọi mạng khi đang nhập');
+  assert.equal(client.getDb().products[0].name, 'DangNhap', 'giữ nguyên nội dung đang nhập');
 });

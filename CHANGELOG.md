@@ -5,6 +5,17 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.6.0] - 2026-11-06
+
+### Tự làm mới giữa PC và điện thoại
+
+- **Tự động đồng bộ khi dùng chung LAN**: thiết bị đang mở tự kiểm tra bản mới
+  mỗi 15 giây, khi quay lại tab hoặc khi cửa sổ được focus. Nếu máy chủ có bản
+  mới hơn, app tải lại và hiện thông báo — không cần reload thủ công.
+- **Không ghi đè khi đang làm việc**: tạm hoãn làm mới khi máy có thay đổi chưa
+  gửi (`dirty`), khi đang gõ trong ô nhập, hoặc khi đang mở hộp thoại sửa.
+- Thêm 5 test client cho cơ chế làm mới (client test 22/22).
+
 ## [2.5.0] - 2026-11-06
 
 ### Ổn định dữ liệu & vòng đời server
