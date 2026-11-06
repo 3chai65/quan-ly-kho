@@ -5,6 +5,18 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.5.0] - 2026-11-06
+
+### Ổn định dữ liệu & vòng đời server
+
+- **Giữ `created_at` gốc**: `writeState` (xóa sạch rồi ghi lại) nay đọc `created_at`
+  hiện có của `products`/`transactions` và giữ nguyên thay vì đặt lại thành thời
+  điểm ghi. Bản ghi mới vẫn nhận `now`.
+- **Đóng sạch khi dừng (SIGTERM/SIGINT)**: handler ngừng nhận request, đóng DB
+  (checkpoint WAL) rồi thoát; có timeout 10s phòng request treo. `docker stop`
+  không còn cắt đột ngột.
+- Thêm test `created_at` giữ nguyên (server test 11/11).
+
 ## [2.4.0] - 2026-11-06
 
 ### Dọn dẹp repo (theo đánh giá review)

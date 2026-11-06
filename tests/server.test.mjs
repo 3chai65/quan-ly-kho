@@ -178,6 +178,38 @@ test('server.js: tự động tạo backup sau khi ghi dữ liệu', async () =>
   assert.ok(body.count >= 1);
 });
 
+test('server.js: giữ created_at gốc khi ghi lại (không đặt lại)', async () => {
+  // Ghi lần 1
+  await put(emptyState({
+    products: [{ id: 'KEEP1', name: 'GiuNgay', stock: 1, costPrice: 1 }],
+    transactions: [{ id: 'KTX1', date: '2026-11-06', type: 'NHAP', productId: 'KEEP1', qty: 1, price: 1, total: 1, ts: 1 }]
+  }), { 'X-Force': '1' });
+
+  const DB = (await import('better-sqlite3')).default;
+  const dbPath = path.join(dataDir, 'app.db');
+  const readCreated = () => {
+    const conn = new DB(dbPath, { readonly: true });
+    const p = conn.prepare('SELECT created_at FROM products WHERE id = ?').get('KEEP1');
+    const t = conn.prepare('SELECT created_at FROM transactions WHERE id = ?').get('KTX1');
+    conn.close();
+    return { p: p && p.created_at, t: t && t.created_at };
+  };
+
+  const first = readCreated();
+  assert.ok(first.p > 0 && first.t > 0, 'phải có created_at sau lần ghi đầu');
+
+  // Đợi để mốc thời gian khác, rồi ghi lại cùng id
+  await new Promise(r => setTimeout(r, 30));
+  await put(emptyState({
+    products: [{ id: 'KEEP1', name: 'GiuNgay', stock: 5, costPrice: 2 }],
+    transactions: [{ id: 'KTX1', date: '2026-11-06', type: 'NHAP', productId: 'KEEP1', qty: 5, price: 2, total: 10, ts: 1 }]
+  }), { 'X-Force': '1' });
+
+  const second = readCreated();
+  assert.equal(second.p, first.p, 'created_at của product phải giữ nguyên');
+  assert.equal(second.t, first.t, 'created_at của transaction phải giữ nguyên');
+});
+
 test('server.js: trang GET / dựng HTML, hết placeholder', async () => {
   const r = await fetch(`${BASE}/`);
   assert.equal(r.status, 200);

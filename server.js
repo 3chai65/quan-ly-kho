@@ -288,6 +288,14 @@ const insertRx = () => db.prepare('INSERT INTO prescriptions (id, name, total_vn
 const insertRxItem = () => db.prepare('INSERT INTO prescription_items (prescription_id, product_id, grams) VALUES (?, ?, ?)');
 
 const writeStateTx = db.transaction((state, now) => {
+  // Giữ created_at gốc của bản ghi đã tồn tại (writeState xóa sạch rồi ghi lại).
+  const prevProductCreated = new Map(
+    db.prepare('SELECT id, created_at FROM products').all().map(r => [r.id, r.created_at])
+  );
+  const prevTxCreated = new Map(
+    db.prepare('SELECT id, created_at FROM transactions').all().map(r => [r.id, r.created_at])
+  );
+
   db.prepare('DELETE FROM prescription_items').run();
   db.prepare('DELETE FROM prescriptions').run();
   db.prepare('DELETE FROM transactions').run();
@@ -296,12 +304,12 @@ const writeStateTx = db.transaction((state, now) => {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(String(now));
 
   const ip = insertProduct();
-  for (const p of state.products) ip.run(p.id, p.name, p.stock, p.costPrice, now, now);
+  for (const p of state.products) ip.run(p.id, p.name, p.stock, p.costPrice, prevProductCreated.get(p.id) || now, now);
 
   const it = insertTx();
   for (const t of state.transactions) {
     it.run(t.id, t.date, t.type, t.productId, t.qty, t.price, t.total, t.cost, t.orderId, t.orderName,
-      t.retail ? 1 : 0, t.rx ? 1 : 0, t.grams, t.thang, t.unitPrice, t.ts, now);
+      t.retail ? 1 : 0, t.rx ? 1 : 0, t.grams, t.thang, t.unitPrice, t.ts, prevTxCreated.get(t.id) || now);
   }
 
   const ir = insertRx();
@@ -477,7 +485,7 @@ app.get('/api/backups', (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('Quản Lý Kho (local) đang chạy:');
   console.log('  PC    : http://localhost:' + PORT);
   console.log('  Mobile: http://<IP-máy-tính>:' + PORT);
@@ -489,3 +497,21 @@ app.listen(PORT, '0.0.0.0', () => {
   runDailyBackup(false);
   setInterval(() => runDailyBackup(false), 60 * 60 * 1000);
 });
+
+// Đóng sạch khi container dừng (docker stop gửi SIGTERM): ngừng nhận request
+// mới, đóng DB để checkpoint WAL, rồi thoát.
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log('[shutdown] Nhận ' + signal + ', đang đóng...');
+  server.close(() => {
+    try { db.close(); } catch (e) { /* đã đóng */ }
+    console.log('[shutdown] Đã đóng sạch.');
+    process.exit(0);
+  });
+  // Nếu còn request treo, thoát cưỡng bức sau 10s.
+  setTimeout(() => process.exit(0), 10000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
