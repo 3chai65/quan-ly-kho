@@ -5,6 +5,14 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.1.1] - 2026-11-06
+
+### CI — bỏ workflow deploy Cloudflare
+
+- Thay `.github/workflows/deploy.yml` (deploy lên Cloudflare Workers, không còn
+  dùng và luôn thất bại) bằng `.github/workflows/ci.yml`: chạy test và build
+  thử Docker image trên mỗi push/PR.
+
 ## [2.1.0] - 2026-11-06
 
 ### Tự động sao lưu mỗi ngày
