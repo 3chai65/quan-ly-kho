@@ -5,6 +5,16 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.2.0] - 2026-11-06
+
+### Tích hợp code-review-graph (MCP)
+
+- Cấu hình `code-review-graph` cho Claude Code để index repo này: `.mcp.json`,
+  `.claude/settings.json` (hooks cập nhật graph), `.claude/skills/`.
+- Thêm `CLAUDE.md` mô tả kiến trúc và hướng dẫn AI dùng graph khi đọc/sửa code.
+- `.mcp.json` và `.claude/` (chứa đường dẫn tuyệt đối theo máy) được gitignore;
+  graph DB `.code-review-graph/` cũng không commit.
+
 ## [2.1.1] - 2026-11-06
 
 ### CI — bỏ workflow deploy Cloudflare

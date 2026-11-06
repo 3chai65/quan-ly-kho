@@ -6,3 +6,8 @@ data/
 # File sao lưu dữ liệu bán hàng: không đưa lên GitHub
 kho-backup-*.json
 *.log
+# Added by code-review-graph
+.code-review-graph/
+# Cấu hình AI theo máy (đường dẫn tuyệt đối) — không commit
+.mcp.json
+.claude/
