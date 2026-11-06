@@ -1057,6 +1057,9 @@ function dec(n){
   }
   return Number(n.toPrecision(15));
 }
+/* Làm tròn tiền (đơn vị nghìn VND) về số nguyên. Dùng cho cả lưu trữ và
+   hiển thị, để tổng các dòng luôn khớp dòng tổng. */
+function money(v){ return Math.round(num(v)); }
 /* Hiển thị đầy đủ chữ số, không làm tròn. Dùng dấu . phân cách nghìn, , thập phân. */
 function fmtNum(n){
   var v = dec(n);
@@ -1084,9 +1087,11 @@ function fmtQty(kg){
   return fmtNum(dec(n * 1000)) + ' g';
 }
 function fmtMoney(k){
-  /* Hiển thị đúng giá trị đã lưu (đơn vị nghìn VND), không cắt lẻ từng dòng
-     để tổng các dòng luôn khớp với dòng tổng. */
-  return fmtNum(dec(k));
+  /* Tiền (đơn vị nghìn VND): làm tròn thành số nguyên, bỏ phần thập phân.
+     Tổng các dòng khớp dòng tổng vì mọi dòng đều làm tròn cùng quy tắc. */
+  var v = Number(k);
+  if (!isFinite(v)) v = 0;
+  return NF0.format(Math.round(v));
 }
 function fmtUnitPrice(k){ return fmtMoney(k) + '/kg'; }
 function fmtInt(n){ return fmtNum(n); }
@@ -1280,7 +1285,7 @@ function sanitize(d){
         id: id,
         name: name,
         stock: dec(p.stock),
-        costPrice: dec(p.costPrice)
+        costPrice: money(p.costPrice)
       });
     });
   }
@@ -1297,9 +1302,9 @@ function sanitize(d){
         type: t.type === 'NHAP' ? 'NHAP' : 'BAN',
         productId: String(t.productId || ''),
         qty: dec(t.qty),
-        price: dec(t.price),
-        total: dec(t.total),
-        cost: t.cost == null ? null : dec(t.cost)
+        price: money(t.price),
+        total: money(t.total),
+        cost: t.cost == null ? null : money(t.cost)
       };
       if (t.oid && t.oname) { tx.oid = String(t.oid); tx.oname = String(t.oname); }
       else if (t.oid && tx.type === 'NHAP') { tx.oid = String(t.oid); }
@@ -1307,7 +1312,7 @@ function sanitize(d){
       if (t.rx) tx.rx = true;
       if (t.g != null) tx.g = dec(t.g);
       if (t.thang != null) tx.thang = dec(t.thang);
-      if (t.unitPrice != null) tx.unitPrice = dec(t.unitPrice);
+      if (t.unitPrice != null) tx.unitPrice = money(t.unitPrice);
       if (num(t.ts) > 0) tx.ts = num(t.ts);
       o.transactions.push(tx);
     });
@@ -1336,7 +1341,7 @@ function sanitize(d){
         id: rid,
         name: rname,
         items: items,
-        total: dec(r.total),
+        total: money(r.total),
         thang: Math.max(1, Math.round(num(r.thang)) || 1),
         updatedAt: dec(r.updatedAt)
       });
@@ -1770,19 +1775,19 @@ function remedyThang(){
   return v >= 1 ? v : 1;
 }
 function remedyGrand(){
-  return dec(remedyThang() * num(($('#remedyUnitPrice') || {}).value));
+  return money(remedyThang() * num(($('#remedyUnitPrice') || {}).value));
 }
-/* Hàm thuần: chia grand cho các dòng theo gram; dòng cuối nhận phần dư
-   để tổng các dòng luôn bằng đúng grand. */
+/* Hàm thuần: chia grand (số nguyên) cho các dòng theo gram; các phần đều là
+   số nguyên và dòng cuối nhận phần dư để tổng các dòng luôn bằng đúng grand. */
 function allocateRemedyAmounts(grand, items){
   var list = items || [];
   var totalG = list.reduce(function(a, it){ return a + num(it.g); }, 0);
   var allocated = 0;
   return list.map(function(it, idx){
     var amount = idx === list.length - 1
-      ? dec(grand - allocated)
-      : dec(totalG > 0 ? grand * (num(it.g) / totalG) : 0);
-    allocated = dec(allocated + amount);
+      ? grand - allocated
+      : Math.round(totalG > 0 ? grand * (num(it.g) / totalG) : 0);
+    allocated += amount;
     return amount;
   });
 }
@@ -2036,8 +2041,8 @@ function saveRetail(){
     p.stock = dec(p.stock - it.kg);
     var tx = {
       id: uid('TX'), date: date, type: 'BAN', productId: it.pid,
-      qty: dec(it.kg), price: it.kg > 0 ? dec(it.amount / it.kg) : 0,
-      total: dec(it.amount), cost: dec(it.kg * num(p.costPrice)), ts: ts,
+      qty: dec(it.kg), price: it.kg > 0 ? money(it.amount / it.kg) : 0,
+      total: money(it.amount), cost: money(it.kg * num(p.costPrice)), ts: ts,
       retail: true
     };
     if (oid) { tx.oid = oid; tx.oname = oname; }
@@ -2081,9 +2086,9 @@ function saveRemedy(){
     var amount = amounts[idx];
     var tx = {
       id: uid('TX'), date: date, type: 'BAN', productId: it.pid,
-      qty: dec(kg), price: kg > 0 ? dec(amount / kg) : 0,
-      total: amount, cost: dec(kg * num(p.costPrice)),
-      rx: true, g: dec(it.g), thang: thang, unitPrice: thang > 0 ? dec(grand / thang) : 0,
+      qty: dec(kg), price: kg > 0 ? money(amount / kg) : 0,
+      total: amount, cost: money(kg * num(p.costPrice)),
+      rx: true, g: dec(it.g), thang: thang, unitPrice: thang > 0 ? money(grand / thang) : 0,
       ts: ts
     };
     if (oid) { tx.oid = oid; tx.oname = oname; }
@@ -3281,15 +3286,15 @@ function saveNhap(e){
     var p = it.pid ? findProduct(it.pid) : null;
     if (!p) p = findByName(it.name);
     if (!p) {
-      p = { id: uid('PROD'), name: it.name, stock: 0, costPrice: dec(it.price) };
+      p = { id: uid('PROD'), name: it.name, stock: 0, costPrice: money(it.price) };
       db.products.push(p);
     }
     if (it.qty > 0) {
       p.stock = dec(num(p.stock) + it.qty);
-      if (it.price > 0) p.costPrice = dec(it.price);
+      if (it.price > 0) p.costPrice = money(it.price);
       db.transactions.push({
         id: uid('TX'), date: date, type: 'NHAP', productId: p.id,
-        qty: dec(it.qty), price: dec(it.price), total: dec(it.qty * it.price), cost: null,
+        qty: dec(it.qty), price: money(it.price), total: money(it.qty * it.price), cost: null,
         oid: batchId, ts: ts
       });
       savedN++;
@@ -3461,7 +3466,7 @@ function saveTxEdit(){
         return;
       }
       p.stock = dec(num(p.stock) + delta);
-      if (price > 0) p.costPrice = dec(price);
+      if (price > 0) p.costPrice = money(price);
     } else {
       if (num(p.stock) + 1e-9 < delta) {
         toast('Tồn "' + p.name + '" không đủ (còn ' + fmtQty(p.stock) + ')', 'error');
@@ -3474,10 +3479,10 @@ function saveTxEdit(){
      chỉ fallback về giá hiện tại khi giao dịch cũ không có cost. */
   var oldUnitCost = oldQty > 0 && oldCost > 0 ? dec(oldCost / oldQty) : (p ? num(p.costPrice) : 0);
   t.qty = dec(q);
-  t.price = dec(price);
-  t.total = dec(q * price);
+  t.price = money(price);
+  t.total = money(q * price);
   if (isRx) t.g = dec(qRaw);
-  if (t.type === 'BAN') t.cost = dec(q * oldUnitCost);
+  if (t.type === 'BAN') t.cost = money(q * oldUnitCost);
   if (isRx) {
     var thang = num(t.thang) > 0 ? num(t.thang) : 1;
     if (t.oid) {
@@ -3485,9 +3490,9 @@ function saveTxEdit(){
          để hộp chi tiết luôn khớp Số thang × Giá 1 thang = Thành tiền. */
       var orderItems = db.transactions.filter(function(x){ return x.oid && String(x.oid) === String(t.oid) && x.rx; });
       var orderTotal = orderItems.reduce(function(a, x){ return a + num(x.total); }, 0);
-      orderItems.forEach(function(x){ x.unitPrice = thang > 0 ? dec(orderTotal / thang) : 0; });
+      orderItems.forEach(function(x){ x.unitPrice = thang > 0 ? money(orderTotal / thang) : 0; });
     } else {
-      t.unitPrice = thang > 0 ? dec(t.total / thang) : 0;
+      t.unitPrice = thang > 0 ? money(t.total / thang) : 0;
     }
   }
   closeTxEdit();

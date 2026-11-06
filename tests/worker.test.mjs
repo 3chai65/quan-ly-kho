@@ -117,11 +117,12 @@ test('src/page.js giữ nguyên placeholder CSP/SSR của trang', () => {
 /* Hàm thuần: tiền, số lượng, chuẩn hoá dữ liệu                        */
 /* ------------------------------------------------------------------ */
 
-test('fmtMoney hiển thị đúng giá trị đã lưu, không cắt lẻ', () => {
-  assert.equal(app.fmtMoney(42.5), '42,5');
+test('fmtMoney làm tròn thành số nguyên, bỏ phần thập phân', () => {
+  assert.equal(app.fmtMoney(42.5), '43');
   assert.equal(app.fmtMoney(0), '0');
   assert.equal(app.fmtMoney(1000), '1.000');
-  assert.equal(app.fmtMoney(-2.5), '-2,5');
+  assert.equal(app.fmtMoney(-2.5), '-2');
+  assert.equal(app.fmtMoney(1234.56), '1.235');
   assert.equal(app.fmtNum(0.1 + 0.2), '0,3');
 });
 
@@ -275,19 +276,21 @@ test('mergeCandidates vẫn gộp các dòng bán rời không có cờ retail',
   assert.equal(list[0].items.length, 2);
 });
 
-test('allocateRemedyAmounts chia đủ tiền và dòng cuối nhận phần dư', () => {
+test('allocateRemedyAmounts chia đủ tiền thành số nguyên, dòng cuối nhận phần dư', () => {
   const three = app.allocateRemedyAmounts(100, [{ g: 1 }, { g: 1 }, { g: 1 }]);
   assert.equal(three.length, 3);
-  assert.equal(app.dec(three.reduce((a, b) => a + b, 0)), 100);
+  assert.equal(three.reduce((a, b) => a + b, 0), 100);
+  assert.ok(three.every(Number.isInteger));
 
   const uneven = app.allocateRemedyAmounts(800, [{ g: 3 }, { g: 5 }]);
   assert.deepEqual(uneven, [300, 500]);
 
-  const odd = app.allocateRemedyAmounts(100.001, [{ g: 3 }, { g: 5 }, { g: 7 }, { g: 11 }]);
-  assert.equal(app.dec(odd.reduce((a, b) => a + b, 0)), 100.001);
+  const odd = app.allocateRemedyAmounts(100, [{ g: 3 }, { g: 5 }, { g: 7 }, { g: 11 }]);
+  assert.equal(odd.reduce((a, b) => a + b, 0), 100);
+  assert.ok(odd.every(Number.isInteger));
 
   assert.deepEqual(app.allocateRemedyAmounts(42.5, [{ g: 10 }]), [42.5]);
-  assert.equal(app.dec(app.allocateRemedyAmounts(100, [{ g: 0 }, { g: 0 }]).reduce((a, b) => a + b, 0)), 100);
+  assert.equal(app.allocateRemedyAmounts(100, [{ g: 0 }, { g: 0 }]).reduce((a, b) => a + b, 0), 100);
 });
 
 /* ------------------------------------------------------------------ */

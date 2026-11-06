@@ -113,6 +113,16 @@ function decNullable(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
+/* Tiền (đơn vị nghìn VND) lưu dạng số nguyên. */
+function money(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : 0;
+}
+function moneyNullable(value) {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
 
 function getSourceUpdatedAt() {
   const row = db.prepare("SELECT value FROM app_meta WHERE key = 'source_updated_at'").get();
@@ -197,7 +207,7 @@ function validateState(d) {
     if (productNames.has(nameKey)) { warn('Bỏ sản phẩm trùng tên: ' + name); return; }
     productIds.add(id);
     productNames.add(nameKey);
-    state.products.push({ id, name, stock: decNum(p.stock), costPrice: decNum(p.costPrice) });
+    state.products.push({ id, name, stock: decNum(p.stock), costPrice: money(p.costPrice) });
   });
 
   const txIds = new Set();
@@ -222,11 +232,11 @@ function validateState(d) {
     txIds.add(id);
     state.transactions.push({
       id, date: String(t.date), type: t.type, productId,
-      qty: decNum(t.qty), price: decNum(t.price), total: decNum(t.total), cost: decNullable(t.cost),
+      qty: decNum(t.qty), price: money(t.price), total: money(t.total), cost: moneyNullable(t.cost),
       orderId: t.oid != null ? String(t.oid) : (t.oname != null ? String(t.oname) : null),
       orderName: t.oname != null ? String(t.oname) : (t.oid != null ? String(t.oid) : null),
       retail: !!t.retail, rx: !!t.rx, grams: decNullable(t.g), thang: decNullable(t.thang),
-      unitPrice: decNullable(t.unitPrice), ts: decNullable(t.ts)
+      unitPrice: moneyNullable(t.unitPrice), ts: decNullable(t.ts)
     });
   });
 
@@ -258,7 +268,7 @@ function validateState(d) {
     });
     if (!items.length) { fail(label + ' "' + name + '": không có dòng hợp lệ'); return; }
     state.prescriptions.push({
-      id, name, items, total: decNum(r.total),
+      id, name, items, total: money(r.total),
       thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt)
     });
   });

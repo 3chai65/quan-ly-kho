@@ -5,6 +5,22 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.0.1] - 2026-11-06
+
+### Thay đổi hiển thị & lưu trữ tiền — làm tròn về số nguyên
+
+- **Tiền (đơn vị nghìn VND) luôn là số nguyên.** `fmtMoney` làm tròn (`Math.round`)
+  và hiển thị không còn phần thập phân; bỏ dấu `,` (ví dụ `42,5` → `43`,
+  `1.234,56` → `1.235`).
+- **Làm tròn cả giá trị lưu**, không chỉ hiển thị: `price`, `total`, `cost`,
+  `unitPrice` (giao dịch), `costPrice` (sản phẩm), `total` (đơn thuốc) đều được
+  làm tròn ở cả client (`sanitize`) và server (`validateState`).
+- **Chia tiền đơn thuốc** (`allocateRemedyAmounts`) giờ chia thành số nguyên;
+  dòng cuối nhận phần dư nên tổng các dòng luôn khớp đúng số thang × giá 1 thang.
+- Số lượng/khối lượng (`qty`, `stock`, `grams`, `g`, `thang`) **không** bị làm
+  tròn — vẫn giữ phần thập phân vì là kg/gram.
+- Đã làm tròn lại toàn bộ dữ liệu hiện có (273/463 giao dịch có tiền lẻ → 0).
+
 ## [2.0.0] - 2026-11-06
 
 ### Kiến trúc — chuyển sang chạy local (Docker + SQLite)
