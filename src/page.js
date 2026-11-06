@@ -1,6 +1,5 @@
 /**
- * Quản Lý Kho — HTML + CSS + JS client (nhúng inline).
- * Tách khỏi worker.js để dễ bảo trì; Wrangler tự bundle khi deploy.
+ * Quản Lý Kho — HTML + CSS + JS client (nhúng inline vào server.js).
  */
 
 export const PAGE = String.raw`<!doctype html>
@@ -9,7 +8,7 @@ export const PAGE = String.raw`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quản Lý Kho — Sổ kho, đơn bán và doanh thu</title>
-<meta name="description" content="Quản lý kho dược liệu: đơn bán lẻ, đơn thuốc chén, nhập hàng, tồn kho, lịch sử giao dịch và thống kê doanh thu 12 tháng. Đồng bộ Cloud.">
+<meta name="description" content="Quản lý kho dược liệu: đơn bán lẻ, đơn thuốc chén, nhập hàng, tồn kho, lịch sử giao dịch và thống kê doanh thu 12 tháng. Đồng bộ mạng nội bộ (LAN).">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="themeColor" content="#f5f7fa">
 <meta name="robots" content="noindex, nofollow">
@@ -1305,8 +1304,11 @@ function sanitize(d){
         total: money(t.total),
         cost: t.cost == null ? null : money(t.cost)
       };
-      if (t.oid && t.oname) { tx.oid = String(t.oid); tx.oname = String(t.oname); }
-      else if (t.oid && tx.type === 'NHAP') { tx.oid = String(t.oid); }
+      if (t.oid && t.oname && String(t.oname) !== String(t.oid)) {
+        tx.oid = String(t.oid); tx.oname = String(t.oname);
+      } else if (t.oid) {
+        tx.oid = String(t.oid);
+      }
       if (t.retail) tx.retail = true;
       if (t.rx) tx.rx = true;
       if (t.g != null) tx.g = dec(t.g);
@@ -2343,7 +2345,10 @@ function appendOrderRow(tbody, r, isImp){
   nameBtn.type = 'button';
   nameBtn.setAttribute('data-action', 'order-view');
   nameBtn.setAttribute('data-oid', r.oid);
-  nameBtn.setAttribute('aria-label', 'Xem chi tiết ' + r.oname + ' ngày ' + dateVN(r.date));
+  var ariaOrder = (r.oname && r.oname.indexOf('ngày') !== -1)
+    ? ('Xem chi tiết ' + r.oname)
+    : ('Xem chi tiết ' + r.oname + ' ngày ' + dateVN(r.date));
+  nameBtn.setAttribute('aria-label', ariaOrder);
   tn.appendChild(nameBtn);
   tn.appendChild(el('span', 'muted small', ' · ' + r.n + ' vị'));
   tr.appendChild(tn);
@@ -2373,7 +2378,7 @@ function renderOrder(){
   if (!tb) return;
   var first = items[0];
   var isImp = first.type === 'NHAP';
-  var oname = first.oname || '';
+  var oname = (first.oname && first.oname !== first.oid) ? first.oname : (isImp ? ('Đơn nhập ngày ' + dateVN(first.date)) : '');
   var isRetail = !isImp && (items.some(function(t){ return t.retail; }) || oname === 'Bán lẻ');
   var preset = (!isImp && !isRetail) ? presetByName(oname) : null;
   var metaThang = 0, metaUnit = 0;
@@ -2543,7 +2548,7 @@ function historyData(kind, month, latestOnly){
 
   rows.forEach(function(r){
     if (!r.group) return;
-    if (!r.oname) {
+    if (!r.oname || r.oname === r.oid) {
       r.oname = isImp ? ('Đơn nhập ngày ' + dateVN(r.date) + (r.hasTime ? ' · ' + timeVN(r.ts) : '')) : 'Đơn';
     }
     r.name = r.oname;
@@ -3385,7 +3390,7 @@ function findTx(id){
 function delOrder(oid){
   var items = db.transactions.filter(function(x){ return x.oid === oid; });
   if (!items.length) return;
-  var label = items[0].oname || (items[0].type === 'NHAP'
+  var label = (items[0].oname && items[0].oname !== items[0].oid) ? items[0].oname : (items[0].type === 'NHAP'
     ? 'đơn nhập ngày ' + dateVN(items[0].date)
     : 'đơn');
   if (!confirm('Xóa cả ' + label + '? Tồn kho sẽ được điều chỉnh lại.')) return;
@@ -3513,7 +3518,7 @@ function apiFetch(url, opts){
 function cloudConflict(){
   if (conflictOpen) return Promise.resolve(false);
   conflictOpen = true;
-  var useLatest = confirm('Dữ liệu trên một thiết bị khác đã thay đổi sau lần bạn mở trang này.\n\nOK: tải bản mới nhất về (thay đổi chưa lưu của máy này sẽ mất).\nHủy: giữ bản trên máy này và ghi đè lên Cloud.');
+  var useLatest = confirm('Dữ liệu trên một thiết bị khác đã thay đổi sau lần bạn mở trang này.\n\nOK: tải bản mới nhất về (thay đổi chưa lưu của máy này sẽ mất).\nHủy: giữ bản trên máy này và ghi đè lên máy chủ.');
   conflictOpen = false;
   if (useLatest) return pullState(true, true).then(function(){ return false; });
   return pushState(true, true);
@@ -3553,7 +3558,7 @@ function pushState(manual, force){
     } else if (!syncErrorShown) {
       syncErrorShown = true;
       var err2 = d && (d.error || (d.details && d.details[0]));
-      toast((err2 || 'Chưa lưu được lên Cloud') + ' — dữ liệu vẫn giữ trên máy này', 'error');
+      toast((err2 || 'Chưa lưu được lên máy chủ') + ' — dữ liệu vẫn giữ trên máy này', 'error');
     }
     return ok;
   }).catch(function(){
@@ -3603,7 +3608,9 @@ function busyEditing(){
   var ae = doc.activeElement;
   if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(String(ae.tagName || ''))) return true;
   var dlgs = doc.querySelectorAll ? doc.querySelectorAll('dialog[open]') : null;
-  return !!(dlgs && dlgs.length);
+  if (dlgs && dlgs.length) return true;
+  if (retailItems && retailItems.length) return true;
+  return false;
 }
 function autoRefresh(){
   if (refreshing || dirty || conflictOpen || doc.hidden || busyEditing()) return Promise.resolve(false);
@@ -3736,7 +3743,7 @@ function restoreFromFile(file){
     var msg = 'Khôi phục ' + bak.products.length + ' vị thuốc, ' +
       bak.transactions.length + ' giao dịch, ' +
       bak.prescriptions.length + ' đơn thuốc?\n\n' +
-      'Dữ liệu hiện tại (kể cả trên Cloud) sẽ bị thay thế hoàn toàn.';
+      'Dữ liệu hiện tại (kể cả trên máy chủ) sẽ bị thay thế hoàn toàn.';
     if (!confirm(msg)) return;
     /* Luôn lưu snapshot hiện tại trước khi ghi đè; nếu không tải được thì hủy. */
     if (!backupBeforeRestore()) {
@@ -3744,7 +3751,7 @@ function restoreFromFile(file){
       return;
     }
     db = bak;
-    /* Restore là ghi đè chủ động: bỏ qua kiểm tra conflict và ép ghi lên Cloud. */
+    /* Restore là ghi đè chủ động: bỏ qua kiểm tra conflict và ép ghi lên máy chủ. */
     commit('Đã khôi phục từ file sao lưu (đã lưu bản trước đó)', true);
   };
   fr.onerror = function(){ toast('Không đọc được file', 'error'); };
@@ -4037,7 +4044,7 @@ function init(){
   var savedBase = readBase();
 
   if (local && wasDirty) {
-    /* Có thay đổi chưa gửi: giữ bản local và đẩy lên Cloud. */
+    /* Có thay đổi chưa gửi: giữ bản local và đẩy lên máy chủ. */
     db = local;
     cloudBase = savedBase;
     dirty = true;

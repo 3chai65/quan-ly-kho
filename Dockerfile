@@ -12,7 +12,7 @@ RUN npm ci --omit=dev
 
 COPY server.js ./
 COPY src ./src
-COPY tests/server.test.mjs ./tests/server.test.mjs
+COPY tests ./tests
 
 ENV NODE_ENV=production
 ENV PORT=8787

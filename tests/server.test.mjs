@@ -219,3 +219,54 @@ test('server.js: trang GET / dựng HTML, hết placeholder', async () => {
   assert.ok(!html.includes('%%NEEDFETCH%%'));
   assert.ok(!html.includes('/logout'), 'nút đăng xuất phải đã bị gỡ');
 });
+test('server.js: orderName không fallback thành oid; tự dọn oname === oid khi đọc', async () => {
+  await put(emptyState({
+    products: [{ id: 'P1', name: 'A', stock: 10, costPrice: 1 }],
+    transactions: [
+      { id: 'T_IMP1', date: '2026-11-06', type: 'NHAP', productId: 'P1', qty: 10, price: 1, total: 10, oid: 'IM_001', ts: 1 },
+      { id: 'T_BAN1', date: '2026-11-06', type: 'BAN', productId: 'P1', qty: 1, price: 2, total: 2, oid: 'ORD_001', oname: 'Bán lẻ', ts: 2 }
+    ]
+  }), { 'X-Force': '1' });
+
+  const data = await getState();
+  const imp = data.transactions.find(t => t.id === 'T_IMP1');
+  const ban = data.transactions.find(t => t.id === 'T_BAN1');
+
+  assert.equal(imp.oid, 'IM_001');
+  assert.equal(imp.oname, undefined, 'đơn nhập không có oname thì không được fallback thành oid');
+  assert.equal(ban.oid, 'ORD_001');
+  assert.equal(ban.oname, 'Bán lẻ');
+
+  const DB = (await import('better-sqlite3')).default;
+  const dbPath = path.join(dataDir, 'app.db');
+  const conn = new DB(dbPath);
+  conn.prepare("UPDATE transactions SET order_name = 'IM_001' WHERE id = 'T_IMP1'").run();
+  conn.close();
+
+  const refreshed = await getState();
+  const impRefreshed = refreshed.transactions.find(t => t.id === 'T_IMP1');
+  assert.equal(impRefreshed.oname, undefined, 'readState phải tự dọn bỏ oname khi trùng với oid');
+});
+
+test('server.js: payload quá lớn trả JSON 413', async () => {
+  const largeState = emptyState({
+    products: Array.from({ length: 60000 }, (_, i) => ({
+      id: 'P' + i,
+      name: 'Thuoc ' + i,
+      stock: 1,
+      costPrice: 10
+    }))
+  });
+  const bodyStr = JSON.stringify(largeState);
+  if (bodyStr.length > 4 * 1024 * 1024) {
+    const r = await fetch(`${BASE}/api/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: bodyStr
+    });
+    assert.equal(r.status, 413);
+    const json = await r.json();
+    assert.equal(json.success, false);
+    assert.equal(json.error, 'Payload too large');
+  }
+});

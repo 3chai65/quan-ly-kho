@@ -51,6 +51,7 @@ globalThis.__test = {
   backupBeforeRestore: backupBeforeRestore, downloadBackup: downloadBackup,
   pushState: pushState, pullState: pullState, cloudConflict: cloudConflict,
   autoRefresh: autoRefresh, busyEditing: busyEditing,
+  setRetailItems: function(v){ retailItems = v; },
   setActiveTag: function(tag){ doc.activeElement = tag ? { tagName: tag } : null; },
   setConflictOpen: function(v){ conflictOpen = !!v; },
   setSyncErrorShown: function(v){ syncErrorShown = !!v; }
@@ -472,4 +473,29 @@ test('autoRefresh: KHÔNG tải khi đang gõ trong ô nhập', async () => {
   client.setActiveTag(null);
   assert.equal(calls, 0, 'không được gọi mạng khi đang nhập');
   assert.equal(client.getDb().products[0].name, 'DangNhap', 'giữ nguyên nội dung đang nhập');
-});
+});
+test('sanitize: loại bỏ oname khi trùng với oid (tránh hiển thị ID thay vì ngày nhập)', () => {
+  const out = app.sanitize({
+    products: [{ id: 'p1', name: 'Cam thảo', stock: 10, costPrice: 50 }],
+    transactions: [
+      { id: 't1', date: '2026-11-06', type: 'NHAP', productId: 'p1', qty: 5, price: 50, total: 250, oid: 'IM_123', oname: 'IM_123' },
+      { id: 't2', date: '2026-11-06', type: 'BAN', productId: 'p1', qty: 1, price: 60, total: 60, oid: 'ord_456', oname: 'Bán lẻ' }
+    ],
+    prescriptions: []
+  });
+  assert.equal(out.transactions[0].oid, 'IM_123');
+  assert.equal(out.transactions[0].oname, undefined, 'oname trùng oid phải bị loại bỏ');
+  assert.equal(out.transactions[1].oid, 'ord_456');
+  assert.equal(out.transactions[1].oname, 'Bán lẻ', 'oname thật phải được giữ');
+});
+
+test('busyEditing: tạm hoãn làm mới khi có giỏ hàng bán lẻ chưa lưu', () => {
+  const client = loadClient();
+  client.setActiveTag(null);
+  client.setRetailItems([]);
+  assert.equal(client.busyEditing(), false);
+  client.setRetailItems([{ pid: 'p1', kg: 1, amount: 50 }]);
+  assert.equal(client.busyEditing(), true, 'có dòng trong giỏ hàng bán lẻ phải coi là đang bận');
+  client.setRetailItems([]);
+  assert.equal(client.busyEditing(), false, 'sau khi xóa giỏ hàng thì không còn bận');
+});

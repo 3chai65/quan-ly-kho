@@ -5,6 +5,30 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [2.6.1] - 2026-11-06
+
+### Tinh chỉnh dữ liệu đơn nhập & hoàn thiện môi trường local
+
+- **Vá lỗi tên đơn nhập hiển thị ID**: đơn nhập hàng không có tên riêng trước đây bị
+  gán `orderName = orderId` khi lưu vào server, dẫn đến giao diện hiển thị mã ID thô
+  (ví dụ: `IM_...`) thay vì tên thân thiện `Đơn nhập ngày DD/MM/YYYY`. Server nay lưu
+  `orderName = null` cho đơn nhập và tự động loại bỏ `oname === oid` khi đọc lại state;
+  client cũng chuẩn hóa bỏ `oname` trùng `oid` và xử lý hiển thị chuẩn xác ở mọi nơi
+  (lịch sử nhập, xem chi tiết đơn, hộp thoại xác nhận xóa đơn).
+- **Tạm hoãn tự làm mới khi đang lên đơn bán lẻ**: `busyEditing` nay kiểm tra thêm
+  `retailItems` (giỏ hàng bán lẻ chưa lưu), đảm bảo dữ liệu mới từ thiết bị khác không
+  làm xáo trộn quá trình soạn đơn của người dùng.
+- **Đóng sạch triệt để (WAL checkpoint TRUNCATE)**: trước khi đóng SQLite khi nhận
+  SIGTERM/SIGINT, server thực hiện checkpoint WAL triệt để (`wal_checkpoint(TRUNCATE)`),
+  giúp toàn bộ log được ghi gọn gàng vào file `app.db` chính trên ổ cứng.
+- **Xử lý lỗi Express tập trung (JSON)**: thêm middleware bắt lỗi payload quá lớn (413)
+  và các lỗi server để luôn trả JSON nhất quán thay vì trang HTML lỗi mặc định của Express.
+- **Chuẩn hóa nhãn local**: gỡ bỏ toàn bộ từ khóa "Cloud" còn sót lại trên giao diện và
+  thông báo, thay bằng "máy chủ" / "mạng nội bộ (LAN)".
+- **Docker**: copy toàn bộ thư mục `tests/` vào image (`COPY tests ./tests`), giúp chạy
+  được cả `npm test` (server) và `npm run test:client` (client) trực tiếp bên trong container.
+- Thêm 2 test client mới (24/24) và 2 test server mới (13/13).
+
 ## [2.6.0] - 2026-11-06
 
 ### Tự làm mới giữa PC và điện thoại

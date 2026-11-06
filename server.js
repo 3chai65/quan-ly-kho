@@ -156,7 +156,7 @@ function readState() {
       };
       if (tx.cost == null) delete tx.cost;
       if (tx.oid == null) delete tx.oid;
-      if (tx.oname == null) delete tx.oname;
+      if (tx.oname == null || tx.oname === tx.oid) delete tx.oname;
       if (!tx.retail) delete tx.retail;
       if (!tx.rx) delete tx.rx;
       if (tx.g == null) delete tx.g;
@@ -232,11 +232,14 @@ function validateState(d) {
     const id = String(t.id || randomId());
     if (txIds.has(id)) { warn('Bỏ giao dịch trùng id: ' + id); return; }
     txIds.add(id);
+    const rawOid = t.oid != null ? String(t.oid) : (t.orderId != null ? String(t.orderId) : null);
+    const rawOname = t.oname != null ? String(t.oname).trim() : (t.orderName != null ? String(t.orderName).trim() : null);
+    const orderId = rawOid || (rawOname || null);
+    const orderName = (rawOname && rawOname !== rawOid) ? rawOname : null;
     state.transactions.push({
       id, date: String(t.date), type: t.type, productId,
       qty: decNum(t.qty), price: money(t.price), total: money(t.total), cost: moneyNullable(t.cost),
-      orderId: t.oid != null ? String(t.oid) : (t.oname != null ? String(t.oname) : null),
-      orderName: t.oname != null ? String(t.oname) : (t.oid != null ? String(t.oid) : null),
+      orderId, orderName,
       retail: !!t.retail, rx: !!t.rx, grams: decNullable(t.g), thang: decNullable(t.thang),
       unitPrice: moneyNullable(t.unitPrice), ts: decNullable(t.ts)
     });
@@ -485,6 +488,15 @@ app.get('/api/backups', (req, res) => {
   }
 });
 
+// Middleware xử lý lỗi tập trung: trả JSON thay vì HTML lỗi mặc định của Express.
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.too.large' || err.status === 413) {
+    return res.status(413).json({ success: false, error: 'Payload too large' });
+  }
+  console.error('[server error]', err && err.message ? err.message : err);
+  res.status(err.status || 500).json({ success: false, error: err.message || 'Lỗi server' });
+});
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('Quản Lý Kho (local) đang chạy:');
   console.log('  PC    : http://localhost:' + PORT);
@@ -506,7 +518,10 @@ function shutdown(signal) {
   shuttingDown = true;
   console.log('[shutdown] Nhận ' + signal + ', đang đóng...');
   server.close(() => {
-    try { db.close(); } catch (e) { /* đã đóng */ }
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.close();
+    } catch (e) { /* đã đóng */ }
     console.log('[shutdown] Đã đóng sạch.');
     process.exit(0);
   });
