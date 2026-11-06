@@ -11,3 +11,5 @@ services:
     environment:
       - PORT=8787
       - DATA_DIR=/data
+      # Giờ VN để tên file backup (backup-YYYY-MM-DD.db) đúng ngày địa phương.
+      - TZ=Asia/Ho_Chi_Minh
