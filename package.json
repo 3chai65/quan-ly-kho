@@ -1,10 +1,13 @@
 {
   "name": "quan-ly-kho-local",
-  "version": "1.0.0",
+  "version": "2.3.0",
   "private": true,
   "type": "module",
   "description": "Quản Lý Kho — bản chạy local (Docker + SQLite), thay thế Cloudflare Worker/D1",
   "main": "server.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node --test tests/server.test.mjs",
