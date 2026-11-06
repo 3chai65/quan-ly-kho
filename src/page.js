@@ -14,7 +14,7 @@ export const PAGE = String.raw`<!doctype html>
 <meta name="theme-color" id="themeColor" content="#f5f7fa">
 <meta name="robots" content="noindex, nofollow">
 <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Ccircle cx='256' cy='256' r='256' fill='%23fff'/%3E%3Cpath fill='%23000' d='M256 64c53 0 96 43 96 96s-43 96-96 96s-96 43-96 96s43 96 96 96c-106 0-192-86-192-192S150 64 256 64m0 448a256 256 0 1 0 0-512a256 256 0 1 0 0 512m32-352a32 32 0 1 0-64 0a32 32 0 1 0 64 0m-64 192a32 32 0 1 1 64 0a32 32 0 1 1-64 0'/%3E%3C/svg%3E">
-<style nonce="%%NONCE%%">
+<style>
 *,*::before,*::after{box-sizing:border-box}
 :root{
 color-scheme:light;
@@ -125,7 +125,7 @@ padding:15px 16px;display:flex;align-items:center;justify-content:space-between;
 .ic-amber{background:var(--amber-soft);color:var(--amber-text)}
 .ic-purple{background:var(--purple-soft);color:var(--purple-text)}
 </style>
-<style nonce="%%NONCE%%">
+<style>
 /* ---------- forms ---------- */
 .field{min-width:0}
 .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
@@ -325,7 +325,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
 *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
 </style>
-<script nonce="%%NONCE%%">
+<script>
 (function(){
   var d=document.documentElement,m='system';
   try{m=localStorage.getItem('theme_mode')||'system';}catch(e){}
@@ -1015,7 +1015,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
   <svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>
   <span id="toastMsg">Đã lưu</span>
 </div>
-<script nonce="%%NONCE%%">
+<script>
 (function(){
 'use strict';
 

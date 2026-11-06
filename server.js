@@ -444,7 +444,6 @@ app.get('/', (req, res) => {
   }
   const boot = bootJson(data);
   const html = PAGE
-    .split('%%NONCE%%').join('')            // không dùng nonce (LAN nội bộ)
     .split('%%BOOT%%').join(boot.json)
     .split('%%NEEDFETCH%%').join(boot.needFetch ? 'true' : 'false');
 

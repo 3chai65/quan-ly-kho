@@ -33,7 +33,7 @@ function makeEl() {
 }
 
 function loadClient(extra = {}) {
-  const blocks = [...PAGE.matchAll(/<script nonce="%%NONCE%%">([\s\S]*?)<\/script>/g)]
+  const blocks = [...PAGE.matchAll(/<script>([\s\S]*?)<\/script>/g)]
     .map(m => m[1]);
   const code = blocks.find(b => b.includes('var doc = document;'));
   if (!code) throw new Error('Không tìm thấy script chính trong src/page.js');
@@ -106,8 +106,10 @@ globalThis.__test = {
 
 const app = loadClient();
 
-test('src/page.js giữ nguyên placeholder CSP/SSR của trang', () => {
-  assert.ok(PAGE.includes('<script nonce="%%NONCE%%">'));
+test('src/page.js giữ placeholder SSR cần thiết của trang', () => {
+  assert.ok(PAGE.includes('<script>'), 'không còn nonce (CSP dùng unsafe-inline)');
+  assert.ok(!PAGE.includes('nonce='), 'đã gỡ nonce');
+  assert.ok(!PAGE.includes('%%NONCE%%'), 'đã gỡ placeholder nonce');
   assert.ok(PAGE.includes('window.__DB__=%%BOOT%%;'));
   assert.ok(PAGE.includes('window.__NEED_FETCH__=%%NEEDFETCH%%;'));
   assert.ok(PAGE.trimEnd().endsWith('</html>'));
@@ -462,9 +464,8 @@ test('GET / lắp PAGE từ src/page.js và thay đủ placeholder', async () =>
   assert.ok(!html.includes('%%NONCE%%'));
   assert.ok(!html.includes('%%BOOT%%'));
   assert.ok(!html.includes('%%NEEDFETCH%%'));
-  const nonce = res.headers.get('Content-Security-Policy').match(/nonce-([a-f0-9]+)/)[1];
-  assert.ok(html.includes('<script nonce="' + nonce + '">'));
-  assert.ok(html.includes('<style nonce="' + nonce + '">'));
+  // PAGE không còn dùng nonce (CSP unsafe-inline), nên worker cũng không chèn nonce.
+  assert.ok(!html.includes('nonce='));
 });
 
 test('PUT /api/state chặn tồn kho âm', async () => {
