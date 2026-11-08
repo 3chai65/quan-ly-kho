@@ -944,7 +944,7 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
           <label class="lbl" for="txEditQty" id="txEditQtyLbl">Số lượng (kg)</label>
           <input class="inp inp--num" id="txEditQty" type="number" step="any" min="0" inputmode="decimal">
         </div>
-        <div class="field">
+        <div class="field" id="txEditPriceField">
           <label class="lbl" for="txEditPrice">Đơn giá (k/kg)</label>
           <input class="inp inp--num" id="txEditPrice" type="number" step="any" min="0" inputmode="decimal">
         </div>
@@ -3638,6 +3638,8 @@ function openTxEdit(id){
   var isRx = !!t.rx;
   var lbl = $('#txEditQtyLbl');
   if (lbl) lbl.textContent = isRx ? 'Số gram (mỗi thang)' : 'Số lượng (kg)';
+  var priceField = $('#txEditPriceField');
+  if (priceField) priceField.hidden = isRx;
   $('#txEditQty').value = String(isRx ? num(t.g) : dec(t.qty));
   $('#txEditPrice').value = kInput(t.price);
   var meta = $('#txEditMeta');
