@@ -105,19 +105,28 @@ Có thể thêm job GitHub Actions cuối tuần chạy lệnh này và upload `
    bán/xuất phải kiểm tra đủ hàng trước (sai số cho phép `1e-9`, báo lỗi nếu không đủ).
    App có màn **đối soát tồn kho**: so `stock_kg` với tổng từ `transactions`, cho phép sửa về `calc`;
    nếu số theo lịch sử âm thì app chặn và yêu cầu sửa giao dịch trước.
-2. **Tiền** (lưu bằng số thực; dữ liệu hiện tại tính theo **nghìn VND — “k”**): lưu nguyên
-   giá trị, **hiển thị đúng giá trị đã lưu** (không cắt lẻ từng dòng) để tổng các dòng luôn
-   khớp dòng tổng. Ví dụ `42.5` hiển thị `42,5`. Không làm tròn khi lưu.
+   **Đơn thuốc chén:** vốn từng vị = kg × giá nhập, lãi chia đều, dòng cuối nhận phần dư;
+   sửa gram/xóa vị giữ tiền khách trả, chia lại đơn; giá bán thấp hơn tổng vốn thì không cho lưu;
+   giữ vốn lịch sử khi sửa/xóa.
+2. **Tiền** (lưu bằng **đồng nguyên** qua `money()`; hiển thị theo **nghìn VND** — giữ tới tối đa
+   3 số lẻ để thấy từng đồng): lưu nguyên giá trị, **hiển thị đúng giá trị đã lưu** (không cắt
+   lẻ từng dòng) để tổng các dòng luôn khớp dòng tổng. Ví dụ `42.5` hiển thị `42,5` (nghìn = 42.500
+   đồng). Không làm tròn khi lưu. Lưu/đọc: `money` (đồng) — `kToDong`/`kInput`/`fmtMoney` (nghìn).
 3. **Số kg**: dùng `dec()` để khử sai số dấu phẩy động nhị phân; hiển thị 1 kg = 10 lạng = 1000 g.
 4. **Đồng bộ**: `PUT /api/state` ghi snapshot toàn bộ trong 1 D1 batch.
-   Client gửi header `X-Base-Updated: <updatedAt>`; server so với `app_meta.source_updated_at`,
-   nếu bản trên server mới hơn → **409 conflict** (client hiện dialog "Lấy bản mới nhất" /
-   "Giữ bản máy này", hoặc gửi `X-Force: 1` để ép ghi đè).
+   Client gửi header `X-Base-Updated: <updatedAt>`; thiếu `X-Base-Updated` (không có `X-Force`) → **428**.
+   `X-Base-Updated` không hợp lệ → **400**. Với **400/428**, client **KHÔNG** tự gửi lại — hiện lỗi
+   và nút *"Bỏ thay đổi chưa gửi, lấy bản máy chủ"*; lỗi **5xx/network** retry theo backoff **4s → max 60s**
+   (reset khi thành công). Nếu bản trên server mới hơn → **409 conflict** (client hiện dialog
+   *"Giữ bản máy này" / "Lấy bản mới nhất"*, hoặc gửi `X-Force: 1` để ép ghi đè).
    Client lưu thêm cờ `dirty` + mốc `cloudBase` trong localStorage: thay đổi chưa gửi được
    giữ lại khi tải lại trang và tự đẩy lên server; không còn so sánh đồng hồ máy với server.
-   Server kiểm tra snapshot trước khi ghi (tồn/tiền không âm, ngày `YYYY-MM-DD`, đủ 3 bảng,
-   không trùng khoá) và trả **400** kèm chi tiết; JSON hỏng cũng trả **400**. Server **cảnh báo**
+   Tự làm mới mỗi **15s** khi quay lại tab/focus, tạm hoãn khi đang soạn/`dirty`. Huy hiệu
+   *"Chưa đồng bộ"* + nút *"Bỏ thay đổi chưa gửi"* (có tải JSON nháp trước).
+   Server kiểm tra snapshot trước khi ghi (tồn/tiền không âm, ngày `YYYY-MM-DD`, đủ 3 bảng).
+   **Trùng khóa → 400** (không còn cảnh báo bỏ qua). JSON hỏng cũng trả **400**. Server **cảnh báo**
    (không chặn) khi giao dịch/dòng đơn trỏ tới `productId` không có trong `products`.
+   **Cảnh báo lệch tồn (stockDrift):** app chỉ cảnh báo (**toast**), không chặn ghi; xem màn **Đối chiếu tồn kho**.
 5. **Đăng nhập 1 người dùng**: mở `/` chưa đăng nhập → **trang login 1 ô mật khẩu**
    (HTML thuần, không JS, không chứa dữ liệu). Đăng nhập đúng → cookie `qlk_token`
    `HttpOnly; SameSite=Strict` — **không tự hết hạn**, chỉ kết thúc khi bấm **Đăng xuất**

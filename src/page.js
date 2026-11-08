@@ -63,6 +63,10 @@ a{color:var(--brand-text)}
 .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;color:var(--text);text-decoration:none;letter-spacing:-.01em}
 .brand .ico{width:22px;height:22px;color:var(--brand)}
 .bar__actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sync-badge{max-width:min(440px,72vw);margin:0;padding:6px 10px;border-radius:12px;
+border:1px solid var(--amber);background:var(--amber-soft);color:var(--amber-text);
+font:inherit;font-size:12px;font-weight:700;line-height:1.35;text-align:left;white-space:pre-line;cursor:default}
+.sync-discard{max-width:min(280px,70vw);white-space:normal;line-height:1.3}
 .main{padding:18px 0 0}
 /* ---------- buttons ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 14px;
@@ -377,6 +381,8 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
       <span>Quản Lý Kho</span>
     </a>
     <div class="bar__actions">
+      <button class="sync-badge" id="syncBadge" type="button" hidden>Chưa đồng bộ</button>
+      <button class="btn btn--sm sync-discard" id="syncDiscard" type="button" data-action="sync-discard" hidden>Bỏ thay đổi chưa gửi, lấy bản máy chủ</button>
       <div class="menu">
         <button class="btn btn--sm" type="button" id="themeBtn" data-action="theme-menu" aria-haspopup="true" aria-expanded="false" aria-controls="themeMenu">
           <svg class="ico" aria-hidden="true"><use href="#i-monitor"/></svg><span id="themeLabel">Hệ thống</span>
@@ -800,9 +806,6 @@ table.his td:nth-child(4),table.his td:nth-child(5){text-align:right}
             <button class="btn btn--sm" type="button" data-action="latest-exp">Gần nhất</button>
             <button class="btn btn--sm" type="button" data-action="clear-exp">Tất cả</button>
             <button class="btn btn--sm" type="button" data-action="merge-old" id="mergeBtn" hidden>Gộp đơn thuốc lẻ cũ</button>
-            <button class="btn btn--sm" type="button" data-action="mig-restore" id="migUndo" hidden>
-              <svg class="ico" aria-hidden="true"><use href="#i-cloud-down"/></svg>Hoàn tác chuẩn hoá
-            </button>
           </div>
         </div>
         <div class="tw">
@@ -1057,6 +1060,15 @@ function dec(n){
   }
   return Number(n.toPrecision(15));
 }
+/* Lưu và tính bằng đồng nguyên. Người dùng vẫn gõ và đọc theo nghìn đồng. */
+var DONG_PER_K = 1000;
+function money(v){ return Math.round(num(v)); }
+function kToDong(k){ return Math.round(num(k) * DONG_PER_K); }
+function kInput(dong){
+  var k = num(dong) / DONG_PER_K;
+  if (!isFinite(k)) return '0';
+  return String(Math.round(k * DONG_PER_K) / DONG_PER_K);
+}
 /* Hiển thị đầy đủ chữ số, không làm tròn. Dùng dấu . phân cách nghìn, , thập phân. */
 function fmtNum(n){
   var v = dec(n);
@@ -1083,13 +1095,19 @@ function fmtQty(kg){
   if (Math.abs(lang) >= 1) return fmtNum(lang) + ' lạng';
   return fmtNum(dec(n * 1000)) + ' g';
 }
-function fmtMoney(k){
-  /* Hiển thị đúng giá trị đã lưu (đơn vị nghìn VND), không cắt lẻ từng dòng
-     để tổng các dòng luôn khớp với dòng tổng. */
-  return fmtNum(dec(k));
+function fmtMoney(dong){
+  /* Hiển thị nghìn đồng, giữ tới 3 số lẻ để thấy từng đồng (0,4 nghĩa là 400 đồng). */
+  var v = num(dong) / DONG_PER_K;
+  if (!isFinite(v)) v = 0;
+  var neg = v < 0;
+  if (neg) v = -v;
+  var rounded = Math.round(v * DONG_PER_K) / DONG_PER_K;
+  var bits = rounded.toFixed(3).replace(/\.?0+$/, '').split('.');
+  var ip = bits[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  var fp = bits[1] ? ',' + bits[1] : '';
+  return (neg ? '-' : '') + (ip || '0') + fp;
 }
 function fmtUnitPrice(k){ return fmtMoney(k) + '/kg'; }
-function fmtInt(n){ return fmtNum(n); }
 function pad2(n){ return n < 10 ? '0' + n : '' + n; }
 function todayISO(){ var d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
 function thisMonth(){ return todayISO().slice(0, 7); }
@@ -1258,12 +1276,23 @@ var invPage = 1, impPage = 1, expPage = 1;
 var impAll = false, expAll = false;
 var cloudBase = 0;
 var dirty = false;
+var quotaNote = '';
+var quotaWarned = false;
+var DIRTY_BADGE_MS = 4000;
+var SYNC_RETRY_MAX = 60000;
+var syncRetryDelay = DIRTY_BADGE_MS;
+var syncRetryTimer = null;
 var syncErrorShown = false;
+var syncDetail = '';
+var syncRejected = false;
 var conflictOpen = false;
+var dirtySince = 0;
+var dirtyBadgeTimer = null;
+var pushing = false;
 var toastTimer = null;
 
 function sanitize(d){
-  var o = { products: [], transactions: [], prescriptions: [], updatedAt: 0 };
+  var o = { products: [], transactions: [], prescriptions: [], updatedAt: 0, moneyUnit: 'dong' };
   if (!d || typeof d !== 'object') return o;
   o.updatedAt = dec(d.updatedAt);
   if (Array.isArray(d.products)) {
@@ -1280,7 +1309,7 @@ function sanitize(d){
         id: id,
         name: name,
         stock: dec(p.stock),
-        costPrice: dec(p.costPrice)
+        costPrice: money(p.costPrice)
       });
     });
   }
@@ -1297,17 +1326,21 @@ function sanitize(d){
         type: t.type === 'NHAP' ? 'NHAP' : 'BAN',
         productId: String(t.productId || ''),
         qty: dec(t.qty),
-        price: dec(t.price),
-        total: dec(t.total),
-        cost: t.cost == null ? null : dec(t.cost)
+        price: money(t.price),
+        total: money(t.total),
+        cost: t.cost == null ? null : money(t.cost)
       };
-      if (t.oid && t.oname) { tx.oid = String(t.oid); tx.oname = String(t.oname); }
+      if (t.oid && t.oname) {
+        var _oid = String(t.oid), _on = String(t.oname);
+        if (!(tx.type === 'NHAP' && _on.trim() === _oid.trim())) { tx.oid = _oid; tx.oname = _on; }
+        else { tx.oid = _oid; }
+      }
       else if (t.oid && tx.type === 'NHAP') { tx.oid = String(t.oid); }
       if (t.retail) tx.retail = true;
       if (t.rx) tx.rx = true;
       if (t.g != null) tx.g = dec(t.g);
       if (t.thang != null) tx.thang = dec(t.thang);
-      if (t.unitPrice != null) tx.unitPrice = dec(t.unitPrice);
+      if (t.unitPrice != null) tx.unitPrice = money(t.unitPrice);
       if (num(t.ts) > 0) tx.ts = num(t.ts);
       o.transactions.push(tx);
     });
@@ -1336,7 +1369,7 @@ function sanitize(d){
         id: rid,
         name: rname,
         items: items,
-        total: dec(r.total),
+        total: money(r.total),
         thang: Math.max(1, Math.round(num(r.thang)) || 1),
         updatedAt: dec(r.updatedAt)
       });
@@ -1344,11 +1377,37 @@ function sanitize(d){
   }
   return o;
 }
+function willScaleMoney(d){
+  return !!(d && d.moneyUnit !== 'dong');
+}
+function scaleLegacyMoney(d){
+  if (!willScaleMoney(d)) return d;
+  function up(n){ return Math.round(num(n) * DONG_PER_K); }
+  if (Array.isArray(d.products)) d.products.forEach(function(p){
+    if (p) p.costPrice = up(p.costPrice);
+  });
+  if (Array.isArray(d.transactions)) d.transactions.forEach(function(t){
+    if (!t) return;
+    t.price = up(t.price);
+    t.total = up(t.total);
+    if (t.cost != null && t.cost !== '') t.cost = up(t.cost);
+    if (t.unitPrice != null && t.unitPrice !== '') t.unitPrice = up(t.unitPrice);
+  });
+  if (Array.isArray(d.prescriptions)) d.prescriptions.forEach(function(r){
+    if (r) r.total = up(r.total);
+  });
+  d.moneyUnit = 'dong';
+  return d;
+}
 function readLocal(){
   try {
     var raw = localStorage.getItem(KEY);
     if (!raw) return null;
-    return sanitize(JSON.parse(raw));
+    var parsed = JSON.parse(raw);
+    var legacy = !parsed || willScaleMoney(parsed);
+    var out = sanitize(scaleLegacyMoney(parsed));
+    if (legacy) out._scaledFromK = true;
+    return out;
   } catch (e) { return null; }
 }
 function readDirty(){
@@ -1360,14 +1419,94 @@ function readBase(){
     return isFinite(v) && v > 0 ? v : 0;
   } catch (e) { return 0; }
 }
+function armDirtyBadge(){
+  if (!dirty) {
+    dirtySince = 0;
+    if (dirtyBadgeTimer) { clearTimeout(dirtyBadgeTimer); dirtyBadgeTimer = null; }
+    return;
+  }
+  if (!dirtySince) dirtySince = Date.now();
+  if (dirtyBadgeTimer || Date.now() - dirtySince >= DIRTY_BADGE_MS) return;
+  dirtyBadgeTimer = setTimeout(function(){
+    dirtyBadgeTimer = null;
+    renderSyncBadge();
+  }, DIRTY_BADGE_MS - (Date.now() - dirtySince));
+}
+function renderSyncBadge(){
+  armDirtyBadge();
+  var el = $('#syncBadge');
+  var drop = $('#syncDiscard');
+  var stale = !!(dirty && dirtySince && Date.now() - dirtySince >= DIRTY_BADGE_MS);
+  var show = !!(syncErrorShown || quotaNote || stale);
+  if (el) {
+    el.hidden = !show;
+    if (!show) el.textContent = '';
+    else {
+      var parts = ['Chưa đồng bộ'];
+      if (syncDetail) parts.push(syncDetail);
+      if (quotaNote) parts.push(quotaNote);
+      el.textContent = parts.join('\n');
+    }
+  }
+  if (drop) drop.hidden = !syncRejected;
+}
+function scheduleSyncRetry(){
+  if (syncRetryTimer || conflictOpen || syncRejected) return;
+  var wait = syncRetryDelay;
+  syncRetryTimer = setTimeout(function(){
+    syncRetryTimer = null;
+    syncRetryDelay = Math.min(syncRetryDelay * 2, SYNC_RETRY_MAX);
+    if ((dirty || syncErrorShown) && !syncRejected && !conflictOpen && !busyEditing() && !pushing) pushState(false);
+  }, wait);
+}
+function noteSyncFailure(detail, retry){
+  syncErrorShown = true;
+  syncDetail = detail || 'Dữ liệu trên máy này chưa lên máy chủ.';
+  syncRejected = !retry;
+  renderSyncBadge();
+  /* 400/428 từ chối đúng dữ liệu này. Gửi lại chỉ lặp cùng một lỗi. */
+  if (retry) scheduleSyncRetry();
+  else if (syncRetryTimer) { clearTimeout(syncRetryTimer); syncRetryTimer = null; }
+}
+function discardUnsynced(){
+  if (!confirm('Bỏ các thay đổi chưa gửi và lấy bản trên máy chủ?\n\nMột file JSON của bản nháp sẽ được tải về trước khi bỏ.')) {
+    return Promise.resolve(false);
+  }
+  if (!downloadBackup(false, 'kho-nhap-bi-tu-choi-' + backupStamp() + '.json', true)) {
+    toast('Không tải được bản nháp — đã giữ nguyên dữ liệu trên máy này', 'error');
+    return Promise.resolve(false);
+  }
+  if (syncRetryTimer) { clearTimeout(syncRetryTimer); syncRetryTimer = null; }
+  syncRetryDelay = DIRTY_BADGE_MS;
+  dirty = false;
+  dirtySince = 0;
+  syncErrorShown = false;
+  syncDetail = '';
+  syncRejected = false;
+  renderSyncBadge();
+  return pullState(true, true);
+}
 function saveLocal(){
   try {
     localStorage.setItem(KEY, JSON.stringify(db));
     localStorage.setItem(DIRTY_KEY, dirty ? '1' : '0');
     localStorage.setItem(BASE_KEY, String(cloudBase || 0));
-  } catch (e) {}
+    if (quotaNote) { quotaNote = ''; quotaWarned = false; renderSyncBadge(); }
+  } catch (e) {
+    var quota = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
+    if (quota && !quotaWarned) {
+      quotaWarned = true;
+      quotaNote = 'Bộ nhớ trình duyệt đầy — bản nháp trên máy này có thể không giữ được.';
+      renderSyncBadge();
+    }
+  }
 }
-function touch(){ db.updatedAt = Date.now(); dirty = true; saveLocal(); }
+function touch(){
+  db.updatedAt = Date.now();
+  if (!dirty) dirtySince = Date.now();
+  dirty = true;
+  saveLocal();
+}
 
 /* ================= THÔNG BÁO ================= */
 function toast(msg, kind){
@@ -1675,7 +1814,7 @@ function renderNote(){
       tdm = el('td', 'c-money');
       var mi = el('input', 'inp inp--sm inp--num');
       mi.id = 'noteEditMoney'; mi.type = 'number'; mi.step = 'any'; mi.min = '0'; mi.inputMode = 'decimal';
-      mi.value = String(num(it.amount));
+      mi.value = kInput(it.amount);
       mi.setAttribute('aria-label', 'Thành tiền');
       tdm.appendChild(mi);
       var bs = el('button', 'btn btn--icon');
@@ -1723,7 +1862,7 @@ function commitRetailRow(){
       if (mi) { mi.focus(); if (mi.select) mi.select(); }
       return false;
     }
-    retailItems.push({ pid: row.getAttribute('data-pid'), kg: dec(q), amount: dec(m) });
+    retailItems.push({ pid: row.getAttribute('data-pid'), kg: dec(q), amount: kToDong(m) });
     notePage = 1e9;
   }
   tb.textContent = '';
@@ -1753,14 +1892,14 @@ function noteSave(){
   if (q <= 0) { toast('Số lượng phải lớn hơn 0', 'error'); return; }
   if (m < 0) { toast('Thành tiền không được âm', 'error'); return; }
   it.kg = dec(q);
-  it.amount = dec(m);
+  it.amount = kToDong(m);
   noteEditIdx = -1;
   calcRetail();
 }
 function calcRetail(){
   var total = 0;
   retailItems.forEach(function(it){ total += num(it.amount); });
-  $$('#retailBody .retail-money').forEach(function(i){ total += num(i.value); });
+  $$('#retailBody .retail-money').forEach(function(i){ total += kToDong(i.value); });
   var out = $('#retailTotal');
   if (out) out.textContent = fmtMoney(total);
   renderNote();
@@ -1770,7 +1909,7 @@ function remedyThang(){
   return v >= 1 ? v : 1;
 }
 function remedyGrand(){
-  return dec(remedyThang() * num(($('#remedyUnitPrice') || {}).value));
+  return kToDong(remedyThang() * num(($('#remedyUnitPrice') || {}).value));
 }
 /* Hàm thuần: chia grand cho các dòng theo gram; dòng cuối nhận phần dư
    để tổng các dòng luôn bằng đúng grand. */
@@ -1784,6 +1923,39 @@ function allocateRemedyAmounts(grand, items){
       : dec(totalG > 0 ? grand * (num(it.g) / totalG) : 0);
     allocated = dec(allocated + amount);
     return amount;
+  });
+}
+/* Vốn từng vị là đồng nguyên (kg × giá nhập). Chỉ phần lãi chia đều,
+   dòng cuối nhận số dư vài đồng. Trả null khi giá khách trả thấp hơn vốn. */
+function balanceRemedyMoney(grand, lines){
+  var list = lines || [];
+  var g0 = money(grand);
+  var costs = list.map(function(l){ return money(l.exactCost); });
+  var totalCost = 0;
+  costs.forEach(function(c){ totalCost += c; });
+  if (g0 < totalCost) return null;
+  var totals = allocateRemedyByCost(g0, costs.map(function(c){ return { cost: c }; }));
+  return costs.map(function(c, i){ return { cost: c, total: totals[i] }; });
+}
+/* Hàm thuần cho đơn thuốc chén. grand là số khách trả (số nguyên).
+   lines[].cost là vốn từng vị, đã là số nguyên.
+   Thành tiền vị = vốn + phần lãi chia đều theo số vị.
+   Dòng cuối nhận phần dư để tổng các dòng đúng bằng grand. */
+function allocateRemedyByCost(grand, lines){
+  var list = lines || [];
+  var n = list.length;
+  if (!n) return [];
+  var g0 = money(grand);
+  var costs = list.map(function(l){ return money(l.cost); });
+  var totalCost = 0;
+  costs.forEach(function(c){ totalCost += c; });
+  var lai = g0 - totalCost;
+  var base = Math.floor(lai / n);
+  var allocated = 0;
+  return costs.map(function(cost, idx){
+    var share = idx === n - 1 ? (lai - allocated) : base;
+    allocated += share;
+    return cost + share;
   });
 }
 function calcRemedy(){
@@ -1887,7 +2059,7 @@ function loadPreset(id){
   var th = $('#remedyThang');
   if (th) th.value = String(thang);
   var up = $('#remedyUnitPrice');
-  if (up) up.value = num(r.total) > 0 ? String(dec(num(r.total) / thang)) : '';
+  if (up) up.value = num(r.total) > 0 ? kInput(num(r.total) / thang) : '';
   renumber(tb);
   calcRemedy();
   updatePresetUI();
@@ -1949,12 +2121,12 @@ function savePreset(){
   if (cur) {
     cur.name = name;
     cur.items = items;
-    cur.total = dec(grand);
+    cur.total = money(grand);
     cur.thang = thang;
     cur.updatedAt = Date.now();
     msg = 'Đã cập nhật đơn "' + name + '"';
   } else {
-    cur = { id: uid('RX'), name: name, items: items, total: dec(grand), thang: thang, updatedAt: Date.now() };
+    cur = { id: uid('RX'), name: name, items: items, total: money(grand), thang: thang, updatedAt: Date.now() };
     db.prescriptions.push(cur);
     msg = 'Đã lưu đơn "' + name + '"';
   }
@@ -1988,7 +2160,7 @@ function copyPreset(){
     id: uid('RX'),
     name: name,
     items: items,
-    total: dec(remedyGrand()),
+    total: money(remedyGrand()),
     thang: remedyThang(),
     updatedAt: Date.now()
   };
@@ -2036,8 +2208,8 @@ function saveRetail(){
     p.stock = dec(p.stock - it.kg);
     var tx = {
       id: uid('TX'), date: date, type: 'BAN', productId: it.pid,
-      qty: dec(it.kg), price: it.kg > 0 ? dec(it.amount / it.kg) : 0,
-      total: dec(it.amount), cost: dec(it.kg * num(p.costPrice)), ts: ts,
+      qty: dec(it.kg), price: it.kg > 0 ? money(it.amount / it.kg) : 0,
+      total: money(it.amount), cost: money(it.kg * num(p.costPrice)), ts: ts,
       retail: true
     };
     if (oid) { tx.oid = oid; tx.oname = oname; }
@@ -2069,21 +2241,28 @@ function saveRemedy(){
       return;
     }
   }
+  var priced = items.map(function(it){
+    var p = findProduct(it.pid);
+    var kg = dec(it.g / 1000 * thang);
+    return { it: it, p: p, kg: kg, exactCost: kg * num(p.costPrice) };
+  });
+  /* Vốn từng vị = kg × giá nhập. Khách vẫn trả số thang × giá 1 thang. */
+  var balanced = balanceRemedyMoney(grand, priced);
+  if (!balanced) { toast('Giá bán thấp hơn vốn của đơn', 'error'); return; }
   var oname = capWords(($('#remedyName') || {}).value) || 'Đơn thuốc lẻ';
   var oid = uid('OD');
   var ts = Date.now();
-  /* Chia tiền theo gram; dòng cuối nhận phần dư để tổng khớp tuyệt đối. */
-  var amounts = allocateRemedyAmounts(grand, items);
-  items.forEach(function(it, idx){
-    var p = findProduct(it.pid);
-    var kg = it.g / 1000 * thang;
+  priced.forEach(function(row, idx){
+    var it = row.it;
+    var p = row.p;
+    var kg = row.kg;
     p.stock = dec(p.stock - kg);
-    var amount = amounts[idx];
+    var amount = balanced[idx].total;
     var tx = {
       id: uid('TX'), date: date, type: 'BAN', productId: it.pid,
-      qty: dec(kg), price: kg > 0 ? dec(amount / kg) : 0,
-      total: amount, cost: dec(kg * num(p.costPrice)),
-      rx: true, g: dec(it.g), thang: thang, unitPrice: thang > 0 ? dec(grand / thang) : 0,
+      qty: kg, price: kg > 0 ? money(amount / kg) : 0,
+      total: amount, cost: balanced[idx].cost,
+      rx: true, g: dec(it.g), thang: thang, unitPrice: thang > 0 ? money(grand / thang) : 0,
       ts: ts
     };
     if (oid) { tx.oid = oid; tx.oname = oname; }
@@ -2801,22 +2980,7 @@ function recFixAll(){
   commit('Đã chỉnh tồn ' + valid.length + ' vị thuốc');
   renderRec();
 }
-/* ================= HOÀN TÁC CHUẨN HOÁ CŨ ================= */
-var MIG_KEY = 'kho_migrate_retail_v1';
-var MIG_BAK = 'kho_backup_premig_v1';
 
-function restoreMigrate(){
-  var raw = null;
-  try { raw = localStorage.getItem(MIG_BAK); } catch (e) {}
-  if (!raw) { toast('Không có bản sao lưu', 'error'); return; }
-  if (!confirm('Khôi phục toàn bộ dữ liệu trước khi chuẩn hoá?')) return;
-  var bak = null;
-  try { bak = sanitize(JSON.parse(raw)); } catch (e) {}
-  if (!bak) { toast('Bản sao lưu không đọc được', 'error'); return; }
-  db = bak;
-  try { localStorage.removeItem(MIG_KEY); } catch (e) {}
-  commit('Đã khôi phục dữ liệu trước chuẩn hoá', true);
-}
 
 /* ================= BIỂU ĐỒ ================= */
 var chartSel = -1, chartGeo = null;
@@ -3144,7 +3308,7 @@ function nhapPick(p){
   var price = $('#nhapPrice');
   var l = lastImport(p.id);
   var v = l ? l.price : num(p.costPrice);
-  if (price) price.value = v > 0 ? String(v) : '';
+  if (price) price.value = v > 0 ? kInput(v) : '';
   var hint = $('#nhapHint');
   if (hint) {
     if (v > 0) {
@@ -3180,7 +3344,7 @@ function calcNhap(){
   var q = num(($('#nhapQty') || {}).value);
   var p = num(($('#nhapPrice') || {}).value);
   var out = $('#nhapTotal');
-  if (out) out.textContent = fmtMoney(q * p);
+  if (out) out.textContent = fmtMoney(kToDong(q * p));
 }
 var nhapList = [];
 function nhapPriceOk(p, price){
@@ -3242,7 +3406,7 @@ function addNhapItem(){
   var inp = $('#nhapSearch');
   var name = capWords((inp || {}).value);
   var qty = num(($('#nhapQty') || {}).value);
-  var price = num(($('#nhapPrice') || {}).value);
+  var price = kToDong(($('#nhapPrice') || {}).value);
   if (!name) { toast('Nhập tên vị thuốc', 'error'); if (inp) inp.focus(); return; }
   if (qty <= 0) { toast('Nhập số lượng lớn hơn 0', 'error'); var q = $('#nhapQty'); if (q) q.focus(); return; }
   if (price < 0) { toast('Giá nhập không được âm', 'error'); var pNeg = $('#nhapPrice'); if (pNeg) { pNeg.focus(); pNeg.select(); } return; }
@@ -3261,7 +3425,7 @@ function saveNhap(e){
   var name = capWords(($('#nhapSearch') || {}).value);
   if (name) {
     var qty = num(($('#nhapQty') || {}).value);
-    var price = num(($('#nhapPrice') || {}).value);
+    var price = kToDong(($('#nhapPrice') || {}).value);
     if (price < 0) { toast('Giá nhập không được âm', 'error'); var pn = $('#nhapPrice'); if (pn) { pn.focus(); pn.select(); } return; }
     var cp = nhapPid ? findProduct(nhapPid) : findByName(name);
     if (qty > 0 && !nhapPriceOk(cp, price)) { var pi2 = $('#nhapPrice'); if (pi2) { pi2.focus(); pi2.select(); } return; }
@@ -3281,15 +3445,15 @@ function saveNhap(e){
     var p = it.pid ? findProduct(it.pid) : null;
     if (!p) p = findByName(it.name);
     if (!p) {
-      p = { id: uid('PROD'), name: it.name, stock: 0, costPrice: dec(it.price) };
+      p = { id: uid('PROD'), name: it.name, stock: 0, costPrice: money(it.price) };
       db.products.push(p);
     }
     if (it.qty > 0) {
       p.stock = dec(num(p.stock) + it.qty);
-      if (it.price > 0) p.costPrice = dec(it.price);
+      if (it.price > 0) p.costPrice = money(it.price);
       db.transactions.push({
         id: uid('TX'), date: date, type: 'NHAP', productId: p.id,
-        qty: dec(it.qty), price: dec(it.price), total: dec(it.qty * it.price), cost: null,
+        qty: dec(it.qty), price: money(it.price), total: money(it.qty * it.price), cost: null,
         oid: batchId, ts: ts
       });
       savedN++;
@@ -3323,14 +3487,14 @@ function openEdit(id){
   if (!p) return;
   $('#editId').value = p.id;
   $('#editName').value = p.name;
-  $('#editPrice').value = String(num(p.costPrice));
+  $('#editPrice').value = kInput(p.costPrice);
   var d = $('#editDlg');
   if (d && d.showModal) d.showModal(); else if (d) d.setAttribute('open', '');
 }
 function saveEdit(){
   var id = $('#editId').value;
   var name = capWords($('#editName').value);
-  var price = num($('#editPrice').value);
+  var price = kToDong($('#editPrice').value);
   if (!name) { toast('Tên vị thuốc không được để trống', 'error'); return; }
   if (price < 0) { toast('Giá nhập không được âm', 'error'); var ep = $('#editPrice'); if (ep) { ep.focus(); ep.select(); } return; }
   var p = findProduct(id);
@@ -3338,7 +3502,7 @@ function saveEdit(){
   var d = dupName(name, id);
   if (d) { toast('Đã có "' + d.name + '" trong kho', 'error'); return; }
   p.name = name;
-  p.costPrice = dec(price);
+  p.costPrice = money(price);
   closeEdit();
   commit('Đã cập nhật vị thuốc');
 }
@@ -3353,22 +3517,76 @@ function delProduct(id){
   db.products = db.products.filter(function(x){ return String(x.id) !== String(id); });
   commit('Đã xóa vị thuốc');
 }
+/* Vốn từng dòng đã lưu lúc bán là vốn lịch sử: không tính lại theo giá nhập hiện tại.
+   Chỉ dòng cũ chưa có cost mới fallback về giá nhập hiện tại. */
+function remedyLineCost(t){
+  if (t.cost != null && isFinite(Number(t.cost))) return money(t.cost);
+  var prod = findProduct(t.productId);
+  return money(num(t.qty) * (prod ? num(prod.costPrice) : 0));
+}
+/* Vốn mới của dòng bị sửa gram: co giãn theo vốn lịch sử của chính dòng đó. */
+function scaledRemedyCost(t, prevQty, prevCost){
+  var nq = num(t.qty);
+  if (prevCost != null && num(prevCost) > 0 && num(prevQty) > 0) {
+    return money(num(prevCost) * nq / num(prevQty));
+  }
+  var prod = findProduct(t.productId);
+  return money(nq * (prod ? num(prod.costPrice) : 0));
+}
+/* Chia lại tiền khách trả cho các dòng cùng đơn. Giữ nguyên vốn đã lưu của từng dòng,
+   chỉ chia lại phần lãi đều. Trả false (không đổi gì) khi giá bán thấp hơn tổng vốn. */
+function applyRemedyBalance(lines, grand){
+  var costs = lines.map(function(t){ return remedyLineCost(t); });
+  var totalCost = 0;
+  costs.forEach(function(c){ totalCost += c; });
+  var g0 = money(grand);
+  if (g0 < totalCost) return false;
+  var totals = allocateRemedyByCost(g0, costs.map(function(c){ return { cost: c }; }));
+  var unitPrice = 0;
+  lines.forEach(function(t){ if (num(t.unitPrice) > 0) unitPrice = money(t.unitPrice); });
+  lines.forEach(function(t, i){
+    var kg = num(t.qty);
+    t.cost = costs[i];
+    t.total = totals[i];
+    t.price = kg > 0 ? money(totals[i] / kg) : 0;
+    if (unitPrice > 0) t.unitPrice = unitPrice;
+  });
+  return true;
+}
+function remedyMates(t){
+  if (!t || !t.rx || !t.oid) return [];
+  return db.transactions.filter(function(x){
+    return x.rx && x.oid && String(x.oid) === String(t.oid);
+  });
+}
 function delTx(id){
   var t = null;
   for (var i = 0; i < db.transactions.length; i++) if (db.transactions[i].id === id) { t = db.transactions[i]; break; }
   if (!t) return;
-  if (!confirm('Xóa giao dịch này? Tồn kho sẽ được điều chỉnh lại.')) return;
+  var mates = remedyMates(t).filter(function(x){ return x.id !== t.id; });
+  var msg = mates.length
+    ? 'Xóa vị này khỏi đơn thuốc? Tồn kho hoàn lại. Tiền khách trả giữ nguyên và chia lại cho các vị còn lại.'
+    : 'Xóa giao dịch này? Tồn kho sẽ được điều chỉnh lại.';
+  if (!confirm(msg)) return;
   var p = findProduct(t.productId);
   if (p && t.type === 'NHAP' && num(p.stock) - num(t.qty) < -1e-9) {
     toast('Không thể xóa: "' + p.name + '" đã bán, tồn sẽ âm. Hãy sửa/xóa đơn bán liên quan trước.', 'error');
     return;
   }
+  var grand = num(t.total);
+  mates.forEach(function(x){ grand += num(x.total); });
   if (p) {
     if (t.type === 'NHAP') p.stock = dec(p.stock - num(t.qty));
     else p.stock = dec(p.stock + num(t.qty));
   }
   db.transactions = db.transactions.filter(function(x){ return x.id !== id; });
-  commit('Đã xóa giao dịch');
+  if (mates.length && !applyRemedyBalance(mates, grand)) {
+    db.transactions.push(t);
+    if (p) p.stock = dec(num(p.stock) - num(t.qty));
+    toast('Giá bán thấp hơn vốn của đơn', 'error');
+    return;
+  }
+  commit(mates.length ? 'Đã xóa vị và chia lại đơn thuốc' : 'Đã xóa giao dịch');
 }
 /* ================= SỬA GIAO DỊCH ================= */
 var txEditCur = null;
@@ -3421,7 +3639,7 @@ function openTxEdit(id){
   var lbl = $('#txEditQtyLbl');
   if (lbl) lbl.textContent = isRx ? 'Số gram (mỗi thang)' : 'Số lượng (kg)';
   $('#txEditQty').value = String(isRx ? num(t.g) : dec(t.qty));
-  $('#txEditPrice').value = String(dec(t.price));
+  $('#txEditPrice').value = kInput(t.price);
   var meta = $('#txEditMeta');
   if (meta) meta.textContent = (t.rx ? 'Đơn thuốc chén' : t.type === 'NHAP' ? 'Nhập hàng' : 'Bán hàng') + ' · ngày ' +
     dateVN(t.date) + (txHasTime(t) ? ' ' + timeVN(txStamp(t)) : '');
@@ -3433,7 +3651,7 @@ function calcTxEdit(){
   var q = num(($('#txEditQty') || {}).value);
   var p = num(($('#txEditPrice') || {}).value);
   var out = $('#txEditTotal');
-  if (out) out.textContent = fmtMoney(txEditKg(txEditCur, q) * p);
+  if (out) out.textContent = fmtMoney(kToDong(txEditKg(txEditCur, q) * p));
 }
 function closeTxEdit(){
   var d = $('#txDlg');
@@ -3444,11 +3662,11 @@ function saveTxEdit(){
   var t = txEditCur;
   if (!t) return;
   var qRaw = num($('#txEditQty').value);
-  var price = num($('#txEditPrice').value);
+  var price = kToDong($('#txEditPrice').value);
   if (qRaw <= 0) { toast('Số lượng phải lớn hơn 0', 'error'); return; }
-  if (price < 0) { toast('Đơn giá không được âm', 'error'); var ep = $('#txEditPrice'); if (ep) { ep.focus(); ep.select(); } return; }
   var isRx = !!t.rx;
   var q = txEditKg(t, qRaw);
+  if (!isRx && price < 0) { toast('Đơn giá không được âm', 'error'); var ep = $('#txEditPrice'); if (ep) { ep.focus(); ep.select(); } return; }
 
   var p = findProduct(t.productId);
   var oldQty = num(t.qty);
@@ -3461,7 +3679,7 @@ function saveTxEdit(){
         return;
       }
       p.stock = dec(num(p.stock) + delta);
-      if (price > 0) p.costPrice = dec(price);
+      if (price > 0) p.costPrice = money(price);
     } else {
       if (num(p.stock) + 1e-9 < delta) {
         toast('Tồn "' + p.name + '" không đủ (còn ' + fmtQty(p.stock) + ')', 'error');
@@ -3470,26 +3688,36 @@ function saveTxEdit(){
       p.stock = dec(num(p.stock) - delta);
     }
   }
+  if (isRx) {
+    var lines = remedyMates(t);
+    if (!lines.length) lines = [t];
+    var grand = 0;
+    lines.forEach(function(x){ grand += num(x.total); });
+    var prevQty = t.qty;
+    var prevG = t.g;
+    var prevCost = t.cost;
+    t.qty = dec(q);
+    t.g = dec(qRaw);
+    t.cost = scaledRemedyCost(t, prevQty, prevCost);
+    if (!applyRemedyBalance(lines, grand)) {
+      t.qty = prevQty;
+      t.g = prevG;
+      t.cost = prevCost;
+      if (p) p.stock = dec(num(p.stock) + delta);
+      toast('Giá bán thấp hơn vốn của đơn', 'error');
+      return;
+    }
+    closeTxEdit();
+    commit('Đã cập nhật đơn thuốc');
+    return;
+  }
   /* Giữ giá vốn lịch sử: nhân theo đơn giá vốn cũ của chính giao dịch,
      chỉ fallback về giá hiện tại khi giao dịch cũ không có cost. */
   var oldUnitCost = oldQty > 0 && oldCost > 0 ? dec(oldCost / oldQty) : (p ? num(p.costPrice) : 0);
   t.qty = dec(q);
-  t.price = dec(price);
-  t.total = dec(q * price);
-  if (isRx) t.g = dec(qRaw);
-  if (t.type === 'BAN') t.cost = dec(q * oldUnitCost);
-  if (isRx) {
-    var thang = num(t.thang) > 0 ? num(t.thang) : 1;
-    if (t.oid) {
-      /* Giá 1 thang là metadata cấp đơn: cập nhật lại toàn bộ dòng cùng đơn
-         để hộp chi tiết luôn khớp Số thang × Giá 1 thang = Thành tiền. */
-      var orderItems = db.transactions.filter(function(x){ return x.oid && String(x.oid) === String(t.oid) && x.rx; });
-      var orderTotal = orderItems.reduce(function(a, x){ return a + num(x.total); }, 0);
-      orderItems.forEach(function(x){ x.unitPrice = thang > 0 ? dec(orderTotal / thang) : 0; });
-    } else {
-      t.unitPrice = thang > 0 ? dec(t.total / thang) : 0;
-    }
-  }
+  t.price = money(price);
+  t.total = money(q * price);
+  if (t.type === 'BAN') t.cost = money(q * oldUnitCost);
   closeTxEdit();
   commit('Đã cập nhật giao dịch');
 }
@@ -3520,8 +3748,35 @@ function cloudConflict(){
   if (useLatest) return pullState(true, true).then(function(){ return false; });
   return pushState(true, true);
 }
+function syncFailText(d, fallback){
+  var lines = [];
+  if (d && d.error) lines.push(String(d.error));
+  if (d && Array.isArray(d.details)) {
+    for (var i = 0; i < d.details.length && lines.length < 21; i++) lines.push(String(d.details[i]));
+  }
+  return lines.length ? lines.join('\n') : fallback;
+}
+/* Một lần mỗi phiên. Đọc stockDrift, không đọc câu warnings. */
+var stockWarnShown = false;
+function noteStockWarnings(list){
+  if (stockWarnShown || !list || !list.length) return;
+  var names = [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] && list[i].name) names.push(String(list[i].name));
+  }
+  if (!names.length) return;
+  stockWarnShown = true;
+  var shown = names.slice(0, 3);
+  var extra = names.length - shown.length;
+  var msg = shown.join(', ');
+  if (extra > 0) msg += ' và ' + extra + ' vị khác';
+  toast(msg + '. Xem màn Đối chiếu tồn kho.', 'error');
+}
 function pushState(manual, force){
+  if (pushing) return Promise.resolve(false);
+  pushing = true;
   touch();
+  renderSyncBadge();
   var sent = num(db.updatedAt);
   var headers = { 'Content-Type': 'application/json', 'X-Base-Updated': String(cloudBase) };
   if (force) headers['X-Force'] = '1';
@@ -3530,9 +3785,20 @@ function pushState(manual, force){
     headers: headers,
     body: JSON.stringify(db)
   }).then(function(r){
-    return r ? r.json() : null;
-  }).then(function(d){
-    if (d && d.conflict) return cloudConflict();
+    if (!r) return { status: 0, d: null };
+    return r.json().then(function(d){
+      return { status: r.status || 0, d: d };
+    }, function(){
+      return { status: r.status || 0, d: null };
+    });
+  }).then(function(pack){
+    var d = pack.d;
+    var status = pack.status;
+    if (d && d.conflict) {
+      if (syncRetryTimer) { clearTimeout(syncRetryTimer); syncRetryTimer = null; }
+      pushing = false;
+      return cloudConflict();
+    }
     var ok = !!(d && d.success);
     if (ok) {
       cloudBase = num(d.updatedAt) || sent;
@@ -3544,27 +3810,28 @@ function pushState(manual, force){
         dirty = true;
         setTimeout(function(){ pushState(false); }, 0);
       }
-      saveLocal();
-    }
-    if (manual) {
-      var err = d && (d.error || (d.details && d.details[0]));
-      if (ok) syncErrorShown = false;
-      toast(ok ? 'Đã lưu dữ liệu' : (err || 'Lưu dữ liệu thất bại'), ok ? 'ok' : 'error');
-    } else if (ok) {
       syncErrorShown = false;
-    } else if (!syncErrorShown) {
-      syncErrorShown = true;
-      var err2 = d && (d.error || (d.details && d.details[0]));
-      toast((err2 || 'Chưa lưu được lên Cloud') + ' — dữ liệu vẫn giữ trên máy này', 'error');
+      syncDetail = '';
+      syncRejected = false;
+      syncRetryDelay = DIRTY_BADGE_MS;
+      if (syncRetryTimer) { clearTimeout(syncRetryTimer); syncRetryTimer = null; }
+      saveLocal();
+      renderSyncBadge();
+      noteStockWarnings(d && d.stockDrift);
+      if (manual) toast('Đã lưu dữ liệu');
+    } else {
+      var rejected = status >= 400 && status < 500;
+      noteSyncFailure(syncFailText(d, 'Chưa lưu được lên máy chủ — dữ liệu vẫn giữ trên máy này'), !rejected);
+      if (manual) toast(syncFailText(d, 'Chưa lưu được lên máy chủ'), 'error');
     }
     return ok;
   }).catch(function(){
+    noteSyncFailure('Mất kết nối — dữ liệu vẫn giữ trên máy này.', true);
     if (manual) toast('Không kết nối được máy chủ', 'error');
-    else if (!syncErrorShown) {
-      syncErrorShown = true;
-      toast('Mất kết nối — dữ liệu vẫn giữ trên máy này', 'error');
-    }
     return false;
+  }).then(function(ok){
+    pushing = false;
+    return ok;
   });
 }
 function pullState(manual, forceLatest){
@@ -3587,6 +3854,8 @@ function pullState(manual, forceLatest){
         dirty = false;
         saveLocal();
         renderAll();
+        renderSyncBadge();
+        noteStockWarnings(d && d.stockDrift);
         if (manual) toast('Đã tải dữ liệu mới nhất');
         return true;
       }
@@ -3595,6 +3864,56 @@ function pullState(manual, forceLatest){
       return true;
     })
     .catch(function(){ if (manual) toast('Không tải được dữ liệu', 'error'); return false; });
+}
+/* Tự làm mới: chỉ tải khi server có bản mới hơn và máy không có thay đổi
+   chưa gửi. Không hiện toast, không render nếu dữ liệu không đổi. */
+var refreshing = false;
+/* Đang gõ trong ô nhập hoặc đang mở hộp thoại sửa: tạm hoãn để không
+   làm mất nội dung người dùng đang nhập. Sẽ tự làm mới ở nhịp sau. */
+function busyEditing(){
+  var ae = doc.activeElement;
+  if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(String(ae.tagName || ''))) return true;
+  var dlgs = doc.querySelectorAll ? doc.querySelectorAll('dialog[open]') : null;
+  if (dlgs && dlgs.length) return true;
+  if (typeof retailItems !== 'undefined' && retailItems && retailItems.length) return true;
+  if (typeof remedyItems !== 'undefined' && remedyItems && remedyItems.length) return true;
+  if (typeof nhapList !== 'undefined' && nhapList && nhapList.length) return true;
+  return false;
+}
+function autoRefresh(){
+  if (refreshing || dirty || conflictOpen || doc.hidden || busyEditing()) return Promise.resolve(false);
+  refreshing = true;
+  return authFetch('/api/state?t=' + Date.now())
+    .then(function(r){ return r ? r.json() : null; })
+    .then(function(d){
+      refreshing = false;
+      /* Trong lúc chờ máy chủ, người dùng có thể bắt đầu sửa hoặc mở giỏ hàng.
+         Không ghi đè bản đang làm. */
+      if (dirty || conflictOpen || busyEditing()) return false;
+      var server = d && d.success ? sanitize(d.data) : null;
+      if (!server) return false;
+      noteStockWarnings(d && d.stockDrift);
+      if (num(server.updatedAt) > num(cloudBase)) {
+        cloudBase = num(server.updatedAt);
+        db = server;
+        dirty = false;
+        saveLocal();
+        renderAll();
+        if (typeof orderCur !== 'undefined' && orderCur) renderOrder();
+        renderSyncBadge();
+        toast('Đã cập nhật dữ liệu mới từ thiết bị khác');
+        return true;
+      }
+      return false;
+    })
+    .catch(function(){ refreshing = false; return false; });
+}
+function startAutoRefresh(){
+  setInterval(autoRefresh, 15000);                      // định kỳ 15s
+  doc.addEventListener('visibilitychange', function(){  // quay lại tab
+    if (!doc.hidden) autoRefresh();
+  });
+  window.addEventListener('focus', autoRefresh);        // cửa sổ được focus
 }
 
 /* ================= SAO LƯU / KHÔI PHỤC ================= */
@@ -3622,7 +3941,7 @@ function renderBackupInfo(){
     ? 'Chưa sao lưu'
     : (last === todayISO() ? 'Đã sao lưu hôm nay' : 'Sao lưu ' + bakDateText(last));
 }
-function downloadBackup(manual, filename){
+function downloadBackup(manual, filename, skipStamp){
   var url = null;
   try {
     var payload = {
@@ -3645,8 +3964,8 @@ function downloadBackup(manual, filename){
     if (manual) toast('Không tạo được bản sao lưu', 'error');
     return false;
   }
-  try { localStorage.setItem(BAK_LAST, todayISO()); } catch (e) {}
-  renderBackupInfo();
+  try { if (!skipStamp) localStorage.setItem(BAK_LAST, todayISO()); } catch (e) {}
+  if (!skipStamp) renderBackupInfo();
   if (manual) toast('Đã tải file sao lưu về máy');
   return true;
 }
@@ -3667,6 +3986,15 @@ function maybeAutoBackup(){
   toast('Đã tự sao lưu dữ liệu hôm nay');
   return true;
 }
+function moneyRestoreNote(scale, sample, afterCost){
+  var line = scale
+    ? 'File này tính theo nghìn đồng, sẽ nhân 1000 khi nạp.'
+    : 'File này tính theo đồng, giữ nguyên.';
+  if (sample) {
+    line += '\nGiá nhập “' + sample.name + '”: ' + fmtNum(sample.cost) + ' → ' + fmtNum(afterCost) + '.';
+  }
+  return line;
+}
 function parseBackup(text){
   var obj = JSON.parse(text);
   var d = obj && obj.data ? obj.data : obj;
@@ -3674,6 +4002,15 @@ function parseBackup(text){
   /* Bắt buộc đủ 3 bảng: thiếu một bảng sẽ khiến restore xóa mất dữ liệu. */
   if (!Array.isArray(d.products) || !Array.isArray(d.transactions) || !Array.isArray(d.prescriptions)) return null;
   if (obj.app && obj.app !== 'quan-ly-kho') return null;
+  if (obj && obj.moneyUnit === 'dong') d.moneyUnit = 'dong';
+  var scale = willScaleMoney(d);
+  var sample = null;
+  if (Array.isArray(d.products)) {
+    for (var s = 0; s < d.products.length; s++) {
+      var sp = d.products[s];
+      if (sp && sp.name) { sample = { name: String(sp.name), cost: num(sp.costPrice) }; break; }
+    }
+  }
   for (var i = 0; i < d.transactions.length; i++) {
     var t = d.transactions[i];
     if (!t || (t.type !== 'NHAP' && t.type !== 'BAN')) return null;
@@ -3684,7 +4021,18 @@ function parseBackup(text){
     var p = d.products[j];
     if (!p || !p.name || num(p.stock) < 0 || num(p.costPrice) < 0) return null;
   }
-  return sanitize(d);
+  var out = sanitize(scaleLegacyMoney(d));
+  var afterCost = null;
+  if (sample) {
+    for (var k = 0; k < out.products.length; k++) {
+      if (out.products[k] && out.products[k].name === sample.name) {
+        afterCost = out.products[k].costPrice;
+        break;
+      }
+    }
+  }
+  out._moneyNote = moneyRestoreNote(scale, afterCost == null ? null : sample, afterCost);
+  return out;
 }
 function restoreFromFile(file){
   if (!file) return;
@@ -3694,10 +4042,13 @@ function restoreFromFile(file){
     var bak = null;
     try { bak = parseBackup(String(fr.result || '')); } catch (e) {}
     if (!bak) { toast('File sao lưu không hợp lệ hoặc thiếu bảng dữ liệu', 'error'); return; }
+    var moneyNote = bak._moneyNote || '';
+    delete bak._moneyNote;
     var msg = 'Khôi phục ' + bak.products.length + ' vị thuốc, ' +
       bak.transactions.length + ' giao dịch, ' +
       bak.prescriptions.length + ' đơn thuốc?\n\n' +
       'Dữ liệu hiện tại (kể cả trên Cloud) sẽ bị thay thế hoàn toàn.';
+    if (moneyNote) msg += '\n\n' + moneyNote;
     if (!confirm(msg)) return;
     /* Luôn lưu snapshot hiện tại trước khi ghi đè; nếu không tải được thì hủy. */
     if (!backupBeforeRestore()) {
@@ -3811,7 +4162,7 @@ function handleAction(btn){
     case 'rec-fix': recFix(id); break;
     case 'rec-fix-all': recFixAll(); break;
     case 'latest-exp': setMonthInput('expMonth', ''); expAll = false; expPage = 1; renderHistory('exp'); break;
-    case 'mig-restore': restoreMigrate(); break;
+    case 'sync-discard': discardUnsynced(); break;
     case 'backup-now': downloadBackup(true); break;
     case 'restore-file': {
       var ri = $('#restoreInput');
@@ -3997,7 +4348,12 @@ function init(){
   var wasDirty = readDirty();
   var savedBase = readBase();
 
-  if (local && wasDirty) {
+  var scaledFromK = !!(local && local._scaledFromK);
+  if (local) delete local._scaledFromK;
+  /* Bản local cũ còn đơn vị nghìn. Server đã migrate sang đồng thì bỏ
+     bản đó, kẻo đẩy số đã làm tròn đè lên số lẻ gốc vừa nhân 1000. */
+  var dropLegacy = !!(local && wasDirty && scaledFromK && remote && remote.moneyUnit === 'dong');
+  if (local && wasDirty && !dropLegacy) {
     /* Có thay đổi chưa gửi: giữ bản local và đẩy lên Cloud. */
     db = local;
     cloudBase = savedBase;
@@ -4026,19 +4382,15 @@ function init(){
   var cy = $('#chartYear');
   if (cy) cy.value = thisYear();
 
-  var undo = $('#migUndo');
-  if (undo) {
-    var hasBak = false;
-    try { hasBak = !!localStorage.getItem(MIG_BAK); } catch (e) {}
-    undo.hidden = !hasBak;
-  }
-
   bindEvents();
   initSuggest();
   resetRetail();
   resetRemedy();
   renderAll();
   renderBackupInfo();
+  renderSyncBadge();
+  if (dropLegacy) toast('Đã bỏ thay đổi chưa gửi (nâng cấp dữ liệu)');
+  startAutoRefresh();
 
   if (dirty) {
     /* Đẩy bản local chưa gửi lên trước; server trả 409 nếu máy khác đã sửa. */
@@ -4058,6 +4410,18 @@ function init(){
 
 if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', init);
 else init();
+
+globalThis.__test = Object.assign(globalThis.__test || {}, {
+  balanceRemedyMoney: balanceRemedyMoney,
+  allocateRemedyByCost: allocateRemedyByCost,
+  remedyLineCost: remedyLineCost,
+  applyRemedyBalance: applyRemedyBalance,
+  remedyMates: remedyMates,
+  scaledRemedyCost: scaledRemedyCost,
+  discardUnsynced: discardUnsynced,
+  pushState: pushState,
+  pullState: pullState
+});
 
 })();
 </script>

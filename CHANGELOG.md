@@ -5,6 +5,49 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.16.0] - 2026-11-08
+
+### Đồng bộ & API
+- **428/400 header:** thiếu `X-Base-Updated` (không `X-Force`) → **428**; `X-Base-Updated` không hợp lệ → **400**. Với **400/428** client **KHÔNG** tự gửi lại — hiện lỗi và nút *"Bỏ thay đổi chưa gửi, lấy bản máy chủ"*.
+- **Trùng khóa → 400:** validate snapshot từ chối trùng khoá, trả **400** (không còn warn+skip).
+- **created_at giữ, oname≡oid:** giữ `created_at`, chuẩn hoá `oname` tương đương `oid` khi xử lý snapshot.
+- **stockDrift (server + toast client):** cảnh báo lệch tồn, chỉ cảnh báo (**toast**), không chặn ghi; xem màn **Đối chiếu tồn kho**.
+- **Tự làm mới 15s + hoãn:** tự làm mới mỗi **15s** khi quay lại tab/focus, tạm hoãn khi đang soạn/`dirty`.
+- **Huy hiệu 'Chưa đồng bộ' + nút 'Bỏ thay đổi chưa gửi' (+ tải JSON nháp trước):** hiển thị trạng thái chưa đồng bộ, có nút bỏ thay đổi chưa gửi kèm tải JSON nháp trước.
+- **Retry 5xx backoff 4→60s + reset khi thành công:** lỗi **5xx/network** retry **4s → max 60s**, reset backoff khi thành công.
+
+### Đơn thuốc chén
+- **Chia tiền đơn thuốc theo vốn từng vị:** vốn từng vị = kg × giá nhập, lãi chia đều, dòng cuối nhận phần dư.
+- **Giữ vốn lịch sử khi sửa/xóa dòng:** sửa gram/xóa vị giữ tiền khách trả, chia lại đơn; giá bán thấp hơn tổng vốn thì không cho lưu; giữ vốn lịch sử khi sửa/xóa.
+
+### Refactor & test
+- **Gỡ hoàn tác chuẩn hoá (migUndo):** loại bỏ logic hoàn tác chuẩn hoá cũ.
+- **Test 33 (xem lịch sử):** bộ test tăng lên **33** pass.
+
+## [1.15.0] - 2026-11-08
+
+### Đồng nguyên & hiển thị nghìn
+
+- **Tiền lưu bằng đồng nguyên** qua `money()` (API/D1: `cost_price_vnd`, `price_vnd`,
+  `total_vnd`, `cost_vnd`, `unit_price_vnd`, `prescriptions.total_vnd`). Client vẫn gõ và đọc
+  theo **nghìn VND** (`kToDong` khi lưu, `kInput` khi hiện, `fmtMoney` hiển thị nghìn giữ tới
+  3 số lẻ để thấy từng đồng — ví dụ 400 đồng hiện `0,4`).
+- `GET /api/state` trả thêm cờ `moneyUnit: "dong"` trong state.
+- **Migration 1 lần** D1 từ đơn vị nghìn sang đồng: nhân `×1000` các cột tiền + ghi
+  `app_meta.money_unit = 'dong'` (cờ nên idempotent; lỗi thì trả 500 `Không migrate được dữ liệu`).
+- Backup/nháp cũ tính theo nghìn: `scaleLegacyMoney`/`willScaleMoney` nhân `×1000`, `parseBackup`
+  ghi `_moneyNote` (báo file nghìn sẽ nhân 1000 khi nạp); restore hủy ghi chú khi không áp được.
+- Bản local chưa gửi (`_scaledFromK`) khi server đã là đồng thì bỏ và toast `Đã bỏ thay đổi
+  chưa gửi (nâng cấp dữ liệu)`.
+
+### Refactor & test
+
+- `worker.js`: `money()`/`moneyNullable()` cho read/validate/sanitize/write D1; migration D1 một
+  lần qua `migrateMoneyToDong(d1)`.
+- `src/page.js`: thêm `DONG_PER_K`, `money`, `kToDong`, `kInput`, viết lại `fmtMoney(dong)`,
+  `fmtUnitPrice`, `willScaleMoney`/`scaleLegacyMoney`, `_moneyNote` restore, bỏ bản local cũ.
+- Tests: đổi expect `fmtMoney` sang đồng, thêm test `GET /api/state` trả `moneyUnit: 'dong'`.
+
 ## [1.14.2] - 2026-11-05
 
 ### Khôi phục & an toàn dữ liệu

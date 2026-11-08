@@ -46,7 +46,7 @@ function loadClient(extra = {}) {
   if (end === -1) throw new Error('Không tìm thấy điểm kết thúc IIFE');
   js = js.slice(0, end) + `
 globalThis.__test = {
-  fmtMoney: fmtMoney, fmtNum: fmtNum, fmtQty: fmtQty, dec: dec, num: num,
+  fmtMoney: fmtMoney, fmtNum: fmtNum, fmtQty: fmtQty, dec: dec, num: num, kToDong: kToDong,
   sanitize: sanitize, parseBackup: parseBackup, mergeCandidates: mergeCandidates,
   reconcileList: reconcileList, txCogs: txCogs, findProduct: findProduct,
   setDb: function(v){ db = v; },
@@ -57,10 +57,19 @@ globalThis.__test = {
   getBase: function(){ return cloudBase; },
   saveLocal: saveLocal, readDirty: readDirty, readBase: readBase,
   computeStats: computeStats, allocateRemedyAmounts: allocateRemedyAmounts,
+  balanceRemedyMoney: balanceRemedyMoney, allocateRemedyByCost: allocateRemedyByCost,
+  remedyLineCost: remedyLineCost, applyRemedyBalance: applyRemedyBalance,
+  remedyMates: remedyMates, scaledRemedyCost: scaledRemedyCost,
   backupBeforeRestore: backupBeforeRestore, downloadBackup: downloadBackup,
-  pushState: pushState, pullState: pullState, cloudConflict: cloudConflict,
+  pushState: pushState, pullState: pullState, cloudConflict: cloudConflict, discardUnsynced: discardUnsynced,
   setConflictOpen: function(v){ conflictOpen = !!v; },
-  setSyncErrorShown: function(v){ syncErrorShown = !!v; }
+  setSyncErrorShown: function(v){ syncErrorShown = !!v; },
+  isSyncRejected: function(){ return syncRejected; },
+  setSyncRejected: function(v){ syncRejected = !!v; },
+  getSyncRetryDelay: function(){ return syncRetryDelay; },
+  setSyncRetryDelay: function(v){ syncRetryDelay = v; },
+  setSyncRetryTimer: function(v){ syncRetryTimer = v; },
+  setDirtySince: function(v){ dirtySince = v; }
 };
 })();`;
   const store = new Map();
@@ -117,11 +126,15 @@ test('src/page.js giữ nguyên placeholder CSP/SSR của trang', () => {
 /* Hàm thuần: tiền, số lượng, chuẩn hoá dữ liệu                        */
 /* ------------------------------------------------------------------ */
 
-test('fmtMoney hiển thị đúng giá trị đã lưu, không cắt lẻ', () => {
-  assert.equal(app.fmtMoney(42.5), '42,5');
+test('fmtMoney hiện nghìn đồng và giữ tới từng đồng', () => {
   assert.equal(app.fmtMoney(0), '0');
-  assert.equal(app.fmtMoney(1000), '1.000');
-  assert.equal(app.fmtMoney(-2.5), '-2,5');
+  assert.equal(app.fmtMoney(135000), '135');
+  assert.equal(app.fmtMoney(13500), '13,5');
+  assert.equal(app.fmtMoney(400), '0,4');
+  assert.equal(app.fmtMoney(1000000), '1.000');
+  assert.equal(app.fmtMoney(15088170), '15.088,17');
+  assert.equal(app.fmtMoney(-2500), '-2,5');
+  assert.equal(app.kToDong(13.5), 13500);
   assert.equal(app.fmtNum(0.1 + 0.2), '0,3');
 });
 
@@ -493,25 +506,64 @@ test('PUT /api/state chặn tiền âm, ngày sai và thiếu bảng', async () 
   assert.match((await res.json()).details.join(' '), /Thiếu mảng/i);
 });
 
-test('PUT /api/state tự loại bản ghi trùng thay vì làm hỏng batch', async () => {
-  const d1 = fakeD1();
-  const state = structuredClone(emptyState);
-  state.products.push(
-    { id: 'p1', name: 'A Giao', stock: 1, costPrice: 0 },
-    { id: 'p2', name: 'a giao', stock: 2, costPrice: 0 }
-  );
-  state.prescriptions.push(
-    { id: 'r1', name: 'Đơn A', items: [{ productId: 'p1', grams: 5 }, { productId: 'p1', grams: 6 }], total: 10, thang: 1 }
-  );
-  const res = await worker.fetch(put(state), { APP_TOKEN: 'test-token', DB: d1 });
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.success, true);
-  assert.ok(Array.isArray(body.warnings) && body.warnings.length >= 2);
-  const productInserts = d1.writes.filter(w => w.sql.startsWith('INSERT INTO products'));
-  assert.equal(productInserts.length, 1);
-  const itemInserts = d1.writes.filter(w => w.sql.startsWith('INSERT INTO prescription_items'));
-  assert.equal(itemInserts.length, 1);
+test('PUT /api/state trả 400 khi trùng khoá (không warn+skip)', async () => {
+  // trùng tên sản phẩm (lowercase)
+  {
+    const d1 = fakeD1();
+    const state = structuredClone(emptyState);
+    state.products.push({ id: 'p1', name: 'A Giao', stock: 1, costPrice: 0 }, { id: 'p2', name: 'a giao', stock: 2, costPrice: 0 });
+    const res = await worker.fetch(put(state, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: d1 });
+    assert.equal(res.status, 400);
+    assert.ok((await res.json()).details.some(m => /trùng tên/i.test(m)));
+    assert.equal(d1.writes.filter(w => w.sql.startsWith('INSERT INTO products')).length, 0);
+  }
+  // trùng id sản phẩm
+  {
+    const state = structuredClone(emptyState);
+    state.products.push({ id: 'p1', name: 'A', stock: 1, costPrice: 0 }, { id: 'p1', name: 'B', stock: 1, costPrice: 0 });
+    const res = await worker.fetch(put(state, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: fakeD1() });
+    assert.equal(res.status, 400);
+    assert.ok((await res.json()).details.some(m => /trùng id/i.test(m)));
+  }
+  // trùng id giao dịch
+  {
+    const state = structuredClone(emptyState);
+    state.products.push({ id: 'p1', name: 'A', stock: 1, costPrice: 0 });
+    state.transactions.push(
+      { id: 't1', date: '2026-01-01', type: 'BAN', productId: 'p1', qty: 1, price: 1, total: 1 },
+      { id: 't1', date: '2026-01-01', type: 'BAN', productId: 'p1', qty: 1, price: 1, total: 1 }
+    );
+    const res = await worker.fetch(put(state, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: fakeD1() });
+    assert.equal(res.status, 400);
+    assert.ok((await res.json()).details.some(m => /trùng id giao dịch/i.test(m)));
+  }
+  // trùng id / tên đơn thuốc (case-sensitive) và vị lặp trong đơn
+  {
+    const base = () => {
+      const s = structuredClone(emptyState);
+      s.products.push({ id: 'p1', name: 'A', stock: 1, costPrice: 0 });
+      return s;
+    };
+    let s = base();
+    s.prescriptions.push({ id: 'r1', name: 'Đơn', items: [{ productId: 'p1', grams: 1 }], total: 1, thang: 1 },
+                         { id: 'r1', name: 'Khác', items: [{ productId: 'p1', grams: 1 }], total: 1, thang: 1 });
+    let res = await worker.fetch(put(s, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: fakeD1() });
+    assert.equal(res.status, 400);
+    assert.ok((await res.json()).details.some(m => /trùng id/i.test(m)));
+
+    s = base();
+    s.prescriptions.push({ id: 'r1', name: 'Đơn A', items: [{ productId: 'p1', grams: 1 }], total: 1, thang: 1 },
+                         { id: 'r2', name: 'Đơn A', items: [{ productId: 'p1', grams: 1 }], total: 1, thang: 1 });
+    res = await worker.fetch(put(s, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: fakeD1() });
+    assert.equal(res.status, 400);
+    assert.ok((await res.json()).details.some(m => /trùng tên đơn thuốc/i.test(m)));
+
+    s = base();
+    s.prescriptions.push({ id: 'r1', name: 'Đơn', items: [{ productId: 'p1', grams: 1 }, { productId: 'p1', grams: 2 }], total: 1, thang: 1 });
+    res = await worker.fetch(put(s, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: fakeD1() });
+    assert.equal(res.status, 400);
+    assert.ok((await res.json()).details.some(m => /lặp/i.test(m)));
+  }
 });
 
 test('PUT /api/state trả 409 khi thiết bị khác đã ghi (không có X-Force)', async () => {
@@ -542,7 +594,7 @@ test('PUT /api/state cảnh báo productId không tồn tại nhưng vẫn ghi',
   state.products.push({ id: 'p1', name: 'A', stock: 1, costPrice: 0 });
   state.transactions.push({ id: 't1', date: '2026-01-01', type: 'BAN', productId: 'ghost', qty: 1, price: 1, total: 1 });
   state.prescriptions.push({ id: 'r1', name: 'Đơn', items: [{ productId: 'ghost2', grams: 1 }], total: 1, thang: 1 });
-  const res = await worker.fetch(put(state), { APP_TOKEN: 'test-token', DB: d1 });
+  const res = await worker.fetch(put(state, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: d1 });
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.success, true);
@@ -578,6 +630,24 @@ test('GET /api/state đọc giao dịch và dòng đơn theo rowid', async () =>
   assert.ok(d1.sqls.some(sql => sql.includes('FROM prescription_items') && /rowid ASC/.test(sql)));
 });
 
+test('GET /api/state trả data có moneyUnit dong', async () => {
+  const d1 = fakeD1({
+    results(sql) {
+      if (sql.includes('FROM transactions')) {
+        return [{ id: 't1', date: '2026-01-01', type: 'BAN', productId: 'p1', qty: 1, price: 2, total: 2, cost: null, retail: 0, rx: 0 }];
+      }
+      return [];
+    }
+  });
+  const res = await worker.fetch(new Request('https://kho.test/api/state', {
+    headers: { Authorization: 'Bearer test-token' }
+  }), { APP_TOKEN: 'test-token', DB: d1 });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.equal(body.data.moneyUnit, 'dong');
+});
+
 /* ------------------------------------------------------------------ */
 /* Script chuyển backup JSON sang SQL                                  */
 /* ------------------------------------------------------------------ */
@@ -598,4 +668,273 @@ test('backup-to-sql giữ NULL cho cost thay vì biến thành 0', async () => {
   assert.ok(txLine, 'phải sinh câu INSERT transactions');
   assert.match(txLine, /100, NULL, NULL, NULL/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('PUT /api/state: X-Base-Updated không phải số → 400', async () => {
+  const res = await worker.fetch(put(emptyState, { 'X-Base-Updated': 'abc' }), { APP_TOKEN: 'test-token', DB: fakeD1() });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.success, false);
+  assert.match(body.error, /không hợp lệ/i);
+});
+
+test('PUT /api/state: thiếu X-Base-Updated (không X-Force) → 428', async () => {
+  const d1 = fakeD1();
+  const res = await worker.fetch(put(emptyState), { APP_TOKEN: 'test-token', DB: d1 });
+  assert.equal(res.status, 428);
+  const body = await res.json();
+  assert.equal(body.success, false);
+  assert.match(body.error, /X-Base-Updated/);
+  assert.equal(d1.writes.length, 0);
+});
+
+test('PUT /api/state: stockDrift — lệch tồn vẫn ghi (200) và trả stockDrift; khớp thì không có', async () => {
+  const mismatch = structuredClone(emptyState);
+  mismatch.products.push({ id: 'p1', name: 'Lệch', stock: 5, costPrice: 0 });
+  mismatch.transactions.push({ id: 't1', date: '2026-01-01', type: 'NHAP', productId: 'p1', qty: 3, price: 1, total: 3 });
+  let res = await worker.fetch(put(mismatch, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: fakeD1() });
+  assert.equal(res.status, 200);
+  let body = await res.json();
+  assert.equal(body.success, true);
+  assert.ok(Array.isArray(body.stockDrift) && body.stockDrift.length === 1);
+  assert.equal(body.stockDrift[0].id, 'p1');
+  assert.equal(body.stockDrift[0].name, 'Lệch');
+  assert.equal(body.stockDrift[0].stock, 5);
+  assert.equal(body.stockDrift[0].calc, 3);
+
+  const ok = structuredClone(emptyState);
+  ok.products.push({ id: 'p1', name: 'Khớp', stock: 3, costPrice: 0 });
+  ok.transactions.push({ id: 't1', date: '2026-01-01', type: 'NHAP', productId: 'p1', qty: 3, price: 1, total: 3 });
+  res = await worker.fetch(put(ok, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: fakeD1() });
+  assert.equal(res.status, 200);
+  body = await res.json();
+  assert.equal(body.stockDrift, undefined);
+});
+
+test('GET /api/state bỏ oname khi bằng oid', async () => {
+  const d1 = fakeD1({
+    results(sql) {
+      if (sql.includes('FROM transactions')) {
+        return [{ id: 't1', date: '2026-01-01', type: 'NHAP', productId: 'p1', qty: 1, price: 2, total: 2, cost: null, oid: 'IM_001', oname: 'IM_001', retail: 0, rx: 0 }];
+      }
+      return [];
+    }
+  });
+  const res = await worker.fetch(new Request('https://kho.test/api/state', {
+    headers: { Authorization: 'Bearer test-token' }
+  }), { APP_TOKEN: 'test-token', DB: d1 });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.data.transactions[0].oid, 'IM_001');
+  assert.equal(body.data.transactions[0].oname, undefined);
+});
+
+test('PUT /api/state giữ created_at gốc của products/transactions khi ghi lại', async () => {
+  const OLD_P = 1700000000001;
+  const OLD_T = 1700000000002;
+  const d1 = fakeD1({
+    results(sql) {
+      if (sql.includes('created_at') && sql.includes('FROM products')) return [{ id: 'p1', created_at: OLD_P }];
+      if (sql.includes('created_at') && sql.includes('FROM transactions')) return [{ id: 't1', created_at: OLD_T }];
+      return [];
+    }
+  });
+  const state = structuredClone(emptyState);
+  state.products.push({ id: 'p1', name: 'A', stock: 5, costPrice: 10 });
+  state.transactions.push({ id: 't1', date: '2026-01-01', type: 'NHAP', productId: 'p1', qty: 5, price: 10, total: 50 });
+  const res = await worker.fetch(put(state, { 'X-Force': '1' }), { APP_TOKEN: 'test-token', DB: d1 });
+  assert.equal(res.status, 200);
+  const pInsert = d1.writes.find(w => w.sql.startsWith('INSERT INTO products'));
+  const tInsert = d1.writes.find(w => w.sql.startsWith('INSERT INTO transactions'));
+  assert.ok(pInsert && tInsert);
+  // products: (id, name, stock, cost, created_at, updated_at)
+  assert.equal(pInsert.args[4], OLD_P);
+  assert.notEqual(pInsert.args[5], OLD_P); // updated_at = now
+  // transactions: (... 16 cols ..., created_at) = 17 args, created_at last
+  assert.equal(tInsert.args[16], OLD_T);
+});
+
+/* ------------------------------------------------------------------ */
+/* Đơn thuốc chén: chia theo vốn, cân lãi, giữ vốn lịch sử           */
+/* ------------------------------------------------------------------ */
+
+test('allocateRemedyByCost: n dòng cùng vốn → cost + floor(lãi/n), dòng cuối nhận dư', () => {
+  // 3 vị, mỗi vị vốn 100, grand 1000 → lãi 700, floor(700/3)=233, dư 1
+  const out = app.allocateRemedyByCost(1000, [{ cost: 100 }, { cost: 100 }, { cost: 100 }]);
+  assert.deepStrictEqual(out, [333, 333, 334]);
+  assert.equal(out.reduce((a, b) => a + b, 0), 1000);
+  // 2 vị cùng vốn, chia hết
+  assert.deepStrictEqual(app.allocateRemedyByCost(600, [{ cost: 100 }, { cost: 100 }]), [300, 300]);
+  const empty = app.allocateRemedyByCost(0, []);
+  assert.ok(Array.isArray(empty));
+  assert.equal(empty.length, 0);
+});
+
+test('balanceRemedyMoney: giá bán thấp hơn vốn → null; đủ vốn → tổng = grand, lãi chia đều, dòng cuối dư', () => {
+  assert.equal(app.balanceRemedyMoney(250, [{ exactCost: 100 }, { exactCost: 200 }]), null);
+  assert.equal(app.balanceRemedyMoney(299, [{ exactCost: 100 }, { exactCost: 200 }]), null);
+
+  // 2 vị vốn 100/200, grand 1000 → tổng vốn 300, lãi 700, mỗi vị +350 lãi → 450/550
+  const out = app.balanceRemedyMoney(1000, [{ exactCost: 100 }, { exactCost: 200 }]);
+  assert.ok(out);
+  assert.deepEqual(out.map(r => r.cost), [100, 200]);
+  assert.deepEqual(out.map(r => r.total), [450, 550]);
+  assert.equal(out.reduce((a, r) => a + r.total, 0), 1000);
+
+  // lãi chia đều, dòng cuối nhận phần dư (lẻ)
+  const odd = app.balanceRemedyMoney(1001, [{ exactCost: 100 }, { exactCost: 200 }, { exactCost: 300 }]);
+  assert.ok(odd);
+  assert.equal(odd.reduce((a, r) => a + r.total, 0), 1001);
+  // floor((1001-600)/3)=133 → [233,333,435]
+  assert.deepEqual(odd.map(r => r.total), [233, 333, 435]);
+});
+
+test('remedyLineCost / applyRemedyBalance: giữ vốn đã lưu; grand thấp hơn tổng vốn (thiếu) → false', () => {
+  // dòng đã lưu cost → giữ nguyên cost khi cân
+  const lines = [
+    { cost: 100, qty: 0.01, productId: 'x' },
+    { cost: 200, qty: 0.02, productId: 'x' }
+  ];
+  assert.equal(app.remedyLineCost(lines[0]), 100);
+  assert.equal(app.remedyLineCost(lines[1]), 200);
+  const ok = app.applyRemedyBalance(lines, 1000);
+  assert.equal(ok, true);
+  assert.equal(lines[0].cost, 100);
+  assert.equal(lines[1].cost, 200);
+  assert.equal(lines[0].total + lines[1].total, 1000);
+  assert.deepEqual([lines[0].total, lines[1].total], [450, 550]);
+
+  // grand thấp hơn tổng vốn → false, không đổi dòng
+  const short = [
+    { cost: 100, qty: 0.01, total: 111, price: 1 },
+    { cost: 200, qty: 0.02, total: 222, price: 2 }
+  ];
+  const snap = short.map(l => ({ cost: l.cost, total: l.total, price: l.price }));
+  assert.equal(app.applyRemedyBalance(short, 299), false);
+  assert.deepEqual(short.map(l => ({ cost: l.cost, total: l.total, price: l.price })), snap);
+
+  // thiếu (vốn > grand) → false
+  assert.equal(app.applyRemedyBalance([{ cost: 50, qty: 1 }, { cost: 60, qty: 1 }], 100), false);
+});
+
+test('scaledRemedyCost: co giãn theo vốn lịch sử của dòng', () => {
+  // prevCost/prevQty có → scale theo tỉ lệ qty mới
+  const t = { qty: 2, cost: null, productId: 'x' };
+  assert.equal(app.scaledRemedyCost(t, 4, 200), 100);
+  // fallback giá nhập từ db khi thiếu prevCost/prevQty
+  app.setDb({ products: [{ id: 'p1', name: 'A', stock: 1, costPrice: 50 }], transactions: [], prescriptions: [], updatedAt: 0 });
+  assert.equal(app.scaledRemedyCost({ qty: 3, cost: null, productId: 'p1' }, 0, 0), 150);
+});
+
+/* ------------------------------------------------------------------ */
+/* Đồng bộ: 428 từ chối (không retry) + bỏ thay đổi chưa gửi          */
+/* ------------------------------------------------------------------ */
+
+test('pushState nhận 428: 1 lần PUT, không retry, syncRejected bật', async () => {
+  let puts = 0;
+  const timers = [];
+  const fetchStub = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    if (method === 'PUT') {
+      puts++;
+      return { status: 428, json: async () => ({ success: false, error: 'Thiếu X-Base-Updated' }) };
+    }
+    return { status: 200, json: async () => ({ success: true, data: { products: [], transactions: [], prescriptions: [], updatedAt: 1 } }) };
+  };
+  const client = loadClient({
+    fetch: fetchStub,
+    setTimeout(fn, ms) { timers.push({ fn, ms }); return timers.length; },
+    clearTimeout() {}
+  });
+  client.setDb({ products: [{ id: 'p1', name: 'L', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 10 });
+  client.setBase(10);
+  client.setDirtySince(1);
+  client.setDirty(true);
+  const ok = await client.pushState(false, false);
+  assert.equal(ok, false);
+  assert.equal(puts, 1);
+  assert.equal(client.isSyncRejected(), true);
+  // 428 bị từ chối → không lên lịch retry
+  assert.equal(timers.length, 0);
+});
+
+test('discardUnsynced: tải nháp kho-nhap-bi-tu-choi + lấy bản server → dirty xóa, syncRejected tắt', async () => {
+  const calls = [];
+  let downloadName = '';
+  const remote = { products: [{ id: 'p1', name: 'Remote', stock: 2, costPrice: 2 }], transactions: [], prescriptions: [], updatedAt: 50 };
+  const fetchStub = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    calls.push(method);
+    return { status: 200, json: async () => ({ success: true, data: remote }) };
+  };
+  const document = {
+    readyState: 'loading',
+    documentElement: makeEl(),
+    body: makeEl(),
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    createElement() {
+      const e = makeEl();
+      e.click = function () { downloadName = this.download; };
+      return e;
+    },
+    addEventListener() {}, removeEventListener() {}
+  };
+  const client = loadClient({ fetch: fetchStub, confirm: () => true, document, Blob: class { constructor() {} } });
+  client.setDb({ products: [{ id: 'p1', name: 'Local', stock: 1, costPrice: 1 }], transactions: [], prescriptions: [], updatedAt: 10 });
+  client.setDirty(true);
+  client.setSyncRejected(true);
+  const out = await client.discardUnsynced();
+  assert.equal(out, true);
+  assert.match(downloadName, /^kho-nhap-bi-tu-choi-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
+  assert.ok(calls.includes('GET'));
+  assert.equal(client.isDirty(), false);
+  assert.equal(client.isSyncRejected(), false);
+  assert.equal(client.getDb().products[0].name, 'Remote');
+});
+
+test('pushState 5xx/network: lên lịch retry 4000ms; PUT thành công reset delay về 4000', async () => {
+  const timers = [];
+  let mode = '500';
+  let puts = 0;
+  const fetchStub = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    if (method === 'PUT') {
+      puts++;
+      if (mode === 'network') throw new Error('offline');
+      if (mode === '500') return { status: 500, json: async () => ({ success: false, error: 'lỗi máy chủ' }) };
+      return { status: 200, json: async () => ({ success: true, updatedAt: Date.now() }) };
+    }
+    return { status: 200, json: async () => ({ success: true, data: { products: [], transactions: [], prescriptions: [], updatedAt: 1 } }) };
+  };
+  const client = loadClient({
+    fetch: fetchStub,
+    setTimeout(fn, ms) { timers.push({ fn, ms }); return timers.length; },
+    clearTimeout() {}
+  });
+  client.setDb({ products: [], transactions: [], prescriptions: [], updatedAt: 1 });
+  client.setBase(0);
+  client.setDirty(true);
+
+  // 5xx → retry 4000ms
+  await client.pushState(false, false);
+  assert.equal(puts, 1);
+  assert.ok(timers.some(t => t.ms === 4000), 'phải lên lịch retry 4000ms sau 5xx');
+  assert.equal(client.isSyncRejected(), false);
+
+  // network → cũng retry (dọn timer cũ để không chặn schedule mới)
+  timers.length = 0;
+  client.setSyncRetryTimer(null);
+  mode = 'network';
+  client.setSyncRetryDelay(4000);
+  await client.pushState(false, false);
+  assert.ok(timers.some(t => t.ms === 4000), 'phải lên lịch retry 4000ms sau lỗi mạng');
+
+  // PUT thành công → reset về 4000
+  timers.length = 0;
+  mode = 'ok';
+  client.setDirty(true);
+  client.setSyncRetryDelay(16000);
+  await client.pushState(false, false);
+  assert.equal(client.getSyncRetryDelay(), 4000);
 });

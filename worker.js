@@ -54,6 +54,25 @@ function decNum(value){
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
+/* Cùng dec() trên client: dọn nhiễu nhị phân (0.1 + 0.2), không làm tròn số kg thật. */
+function decQty(n){
+  n = Number(n);
+  if (!Number.isFinite(n) || n === 0) return 0;
+  for (let p = 1; p < 15; p++) {
+    const r = Number(n.toPrecision(p));
+    if (Math.abs(n - r) <= Math.abs(n) * 1e-12) return r;
+  }
+  return Number(n.toPrecision(15));
+}
+
+function money(value){
+  return Math.round(decNum(value));
+}
+function moneyNullable(value){
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -83,18 +102,19 @@ async function readState(db){
     itemsByPrescription.set(item.prescriptionId, list);
   }
   return {
-    products: (productsResult.results || []).map(p => ({ id: String(p.id), name: String(p.name), stock: decNum(p.stock), costPrice: decNum(p.costPrice) })),
+    moneyUnit: 'dong',
+    products: (productsResult.results || []).map(p => ({ id: String(p.id), name: String(p.name), stock: decNum(p.stock), costPrice: money(p.costPrice) })),
     transactions: (transactionsResult.results || []).map(t => {
       const tx = {
         id: String(t.id), date: String(t.date), type: t.type === 'NHAP' ? 'NHAP' : 'BAN',
-        productId: String(t.productId), qty: decNum(t.qty), price: decNum(t.price), total: decNum(t.total),
-        cost: decNullable(t.cost), oid: t.oid == null ? undefined : String(t.oid), oname: t.oname == null ? undefined : String(t.oname),
+        productId: String(t.productId), qty: decNum(t.qty), price: money(t.price), total: money(t.total),
+        cost: moneyNullable(t.cost), oid: t.oid == null ? undefined : String(t.oid), oname: t.oname == null ? undefined : String(t.oname),
         retail: !!Number(t.retail), rx: !!Number(t.rx), g: decNullable(t.g), thang: decNullable(t.thang),
-        unitPrice: decNullable(t.unitPrice), ts: decNullable(t.ts)
+        unitPrice: moneyNullable(t.unitPrice), ts: decNullable(t.ts)
       };
       if (tx.cost == null) delete tx.cost;
       if (tx.oid == null) delete tx.oid;
-      if (tx.oname == null) delete tx.oname;
+      if (tx.oname == null || tx.oname === tx.oid) delete tx.oname;
       if (!tx.retail) delete tx.retail;
       if (!tx.rx) delete tx.rx;
       if (tx.g == null) delete tx.g;
@@ -103,7 +123,7 @@ async function readState(db){
       if (tx.ts == null) delete tx.ts;
       return tx;
     }),
-    prescriptions: (prescriptionsResult.results || []).map(r => ({ id: String(r.id), name: String(r.name), items: itemsByPrescription.get(r.id) || [], total: decNum(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt) })),
+    prescriptions: (prescriptionsResult.results || []).map(r => ({ id: String(r.id), name: String(r.name), items: itemsByPrescription.get(r.id) || [], total: money(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt) })),
     updatedAt: sourceUpdatedAt
   };
 }
@@ -114,21 +134,22 @@ function isNonNegNumber(value){
   return Number.isFinite(n) && n >= 0;
 }
 
-/* Kiểm tra + chuẩn hoá snapshot trước khi ghi: chặn dữ liệu âm/sai định dạng
-   và tự loại bản ghi trùng khoá để db.batch() không bị rollback toàn bộ. */
+/* Kiểm tra + chuẩn hoá snapshot trước khi ghi. Trùng khoá → 400 (không warn+skip).
+   Tồn lệch nhập−bán → cảnh báo + stockDrift (không chặn). */
 function validateState(d){
   const errors = [];
   const warnings = [];
+  const stockDrift = [];
   const state = { products: [], transactions: [], prescriptions: [], updatedAt: 0 };
   if (!d || typeof d !== 'object' || Array.isArray(d)) {
-    return { state, errors: ['Dữ liệu không phải object'], warnings };
+    return { state, errors: ['Dữ liệu không phải object'], warnings, stockDrift };
   }
   const fail = msg => { if (errors.length < 20) errors.push(msg); };
   const warn = msg => { if (warnings.length < 50) warnings.push(msg); };
   for (const key of ['products', 'transactions', 'prescriptions']) {
     if (!Array.isArray(d[key])) fail('Thiếu mảng ' + key);
   }
-  if (errors.length) return { state, errors, warnings };
+  if (errors.length) return { state, errors, warnings, stockDrift };
   state.updatedAt = decNum(d.updatedAt);
 
   const productIds = new Set();
@@ -142,11 +163,11 @@ function validateState(d){
     if (!isNonNegNumber(p.costPrice)) fail(label + ' "' + name + '": giá nhập phải >= 0');
     const id = String(p.id || crypto.randomUUID());
     const nameKey = name.toLowerCase();
-    if (productIds.has(id)) { warn('Bỏ sản phẩm trùng id: ' + id); return; }
-    if (productNames.has(nameKey)) { warn('Bỏ sản phẩm trùng tên: ' + name); return; }
+    if (productIds.has(id)) { fail(label + ' "' + name + '": trùng id ' + id); return; }
+    if (productNames.has(nameKey)) { fail(label + ': trùng tên sản phẩm "' + name + '"'); return; }
     productIds.add(id);
     productNames.add(nameKey);
-    state.products.push({ id, name, stock: decNum(p.stock), costPrice: decNum(p.costPrice) });
+    state.products.push({ id, name, stock: decNum(p.stock), costPrice: money(p.costPrice) });
   });
 
   const txIds = new Set();
@@ -167,14 +188,18 @@ function validateState(d){
     if (t.thang != null && !(Number(t.thang) >= 1)) fail(label + ': số thang phải >= 1');
     if (t.unitPrice != null && !isNonNegNumber(t.unitPrice)) fail(label + ': giá 1 thang phải >= 0');
     const id = String(t.id || crypto.randomUUID());
-    if (txIds.has(id)) { warn('Bỏ giao dịch trùng id: ' + id); return; }
+    if (txIds.has(id)) { fail(label + ': trùng id giao dịch ' + id); return; }
     txIds.add(id);
+    const rawOid = t.oid != null ? String(t.oid) : (t.orderId != null ? String(t.orderId) : null);
+    const rawOname = t.oname != null ? String(t.oname).trim() : (t.orderName != null ? String(t.orderName).trim() : null);
+    const orderId = rawOid || null;
+    const orderName = (rawOname && rawOname !== rawOid) ? rawOname : null;
     state.transactions.push({
       id, date: String(t.date), type: t.type, productId,
-      qty: decNum(t.qty), price: decNum(t.price), total: decNum(t.total), cost: decNullable(t.cost),
-      orderId: t.oid == null ? null : String(t.oid), orderName: t.oname == null ? null : String(t.oname),
+      qty: decNum(t.qty), price: money(t.price), total: money(t.total), cost: moneyNullable(t.cost),
+      orderId, orderName,
       retail: !!t.retail, rx: !!t.rx, grams: decNullable(t.g), thang: decNullable(t.thang),
-      unitPrice: decNullable(t.unitPrice), ts: decNullable(t.ts)
+      unitPrice: moneyNullable(t.unitPrice), ts: decNullable(t.ts)
     });
   });
 
@@ -189,8 +214,8 @@ function validateState(d){
     const id = String(r.id || crypto.randomUUID());
     /* prescriptions.name là UNIQUE phân biệt hoa/thường. */
     const nameKey = name;
-    if (rxIds.has(id)) { warn('Bỏ đơn thuốc trùng id: ' + id); return; }
-    if (rxNames.has(nameKey)) { warn('Bỏ đơn thuốc trùng tên: ' + name); return; }
+    if (rxIds.has(id)) { fail(label + ' "' + name + '": trùng id ' + id); return; }
+    if (rxNames.has(nameKey)) { fail(label + ': trùng tên đơn thuốc "' + name + '"'); return; }
     rxIds.add(id);
     rxNames.add(nameKey);
     const itemIds = new Set();
@@ -201,18 +226,37 @@ function validateState(d){
       if (!itemPid) { fail(label + ' dòng ' + (j + 1) + ': thiếu productId'); return; }
       if (!productIds.has(itemPid)) warn(label + ' dòng ' + (j + 1) + ': productId không có trong danh sách sản phẩm: ' + itemPid);
       if (!(Number(item.grams) > 0)) { fail(label + ' dòng ' + (j + 1) + ': số gram phải > 0'); return; }
-      if (itemIds.has(itemPid)) { warn('Bỏ vị trùng trong đơn "' + name + '"'); return; }
+      if (itemIds.has(itemPid)) { fail(label + ' "' + name + '": vị thuốc ' + itemPid + ' bị lặp'); return; }
       itemIds.add(itemPid);
       items.push({ productId: itemPid, grams: decNum(item.grams) });
     });
     if (!items.length) { fail(label + ' "' + name + '": không có dòng hợp lệ'); return; }
     state.prescriptions.push({
-      id, name, items, total: decNum(r.total),
+      id, name, items, total: money(r.total),
       thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt)
     });
   });
 
-  return { state, errors, warnings };
+  if (!errors.length) warnStockDrift(state, warn, stockDrift);
+  return { state, errors, warnings, stockDrift };
+}
+
+/* Cảnh báo, không chặn. Sau decQty, lệch quá 1e-9 kg mới tính. */
+function warnStockDrift(state, warn, stockDrift){
+  const inn = new Map();
+  const out = new Map();
+  for (const t of state.transactions) {
+    const bucket = t.type === 'NHAP' ? inn : out;
+    bucket.set(t.productId, (bucket.get(t.productId) || 0) + t.qty);
+  }
+  for (const p of state.products) {
+    const calc = decQty((inn.get(p.id) || 0) - (out.get(p.id) || 0));
+    const diff = decQty(p.stock - calc);
+    if (Math.abs(diff) > 1e-9) {
+      stockDrift.push({ id: p.id, name: p.name, stock: p.stock, calc });
+      warn('"' + p.name + '": tồn ' + p.stock + ' khác nhập − bán ' + calc + ' (lệch ' + diff + ')');
+    }
+  }
 }
 
 function sanitizeState(d){
@@ -221,15 +265,22 @@ function sanitizeState(d){
   out.updatedAt = decNum(d.updatedAt);
   for (const p of Array.isArray(d.products) ? d.products : []) {
     if (!p || !p.name) continue;
-    out.products.push({ id: String(p.id || crypto.randomUUID()), name: String(p.name), stock: decNum(p.stock), costPrice: decNum(p.costPrice) });
+    out.products.push({ id: String(p.id || crypto.randomUUID()), name: String(p.name), stock: decNum(p.stock), costPrice: money(p.costPrice) });
   }
   for (const t of Array.isArray(d.transactions) ? d.transactions : []) {
     if (!t) continue;
+    const rawOid = t.orderId != null ? String(t.orderId) : (t.oid != null ? String(t.oid) : null);
+    const rawOname = t.orderName != null ? String(t.orderName).trim() : (t.oname != null ? String(t.oname).trim() : null);
     const tx = {
       id: String(t.id || crypto.randomUUID()), date: String(t.date || ''), type: t.type === 'NHAP' ? 'NHAP' : 'BAN',
-      productId: String(t.productId || ''), qty: decNum(t.qty), price: decNum(t.price), total: decNum(t.total), cost: decNullable(t.cost),
-      orderId: t.oid == null ? null : String(t.oid), orderName: t.oname == null ? null : String(t.oname),
-      retail: !!t.retail, rx: !!t.rx, grams: decNullable(t.g), thang: decNullable(t.thang), unitPrice: decNullable(t.unitPrice), ts: decNullable(t.ts)
+      productId: String(t.productId || ''), qty: decNum(t.qty), price: money(t.price), total: money(t.total), cost: t.cost == null ? null : money(t.cost),
+      orderId: rawOid || null,
+      orderName: (rawOname && rawOname !== rawOid) ? rawOname : null,
+      retail: !!t.retail, rx: !!t.rx,
+      grams: decNullable(t.grams != null ? t.grams : t.g),
+      thang: decNullable(t.thang),
+      unitPrice: t.unitPrice == null ? null : money(t.unitPrice),
+      ts: decNullable(t.ts)
     };
     out.transactions.push(tx);
   }
@@ -241,7 +292,7 @@ function sanitizeState(d){
       items.push({ productId: String(item.productId), grams: decNum(item.grams) });
     }
     if (!items.length) continue;
-    out.prescriptions.push({ id: String(r.id || crypto.randomUUID()), name: String(r.name), items, total: decNum(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt) });
+    out.prescriptions.push({ id: String(r.id || crypto.randomUUID()), name: String(r.name), items, total: money(r.total), thang: Math.max(1, Math.round(decNum(r.thang)) || 1), updatedAt: decNum(r.updatedAt) });
   }
   return out;
 }
@@ -249,6 +300,14 @@ function sanitizeState(d){
 async function writeState(db, data){
   const state = sanitizeState(data);
   const now = Date.now();
+  // Giữ created_at gốc của bản ghi đã tồn tại (xóa sạch rồi ghi lại).
+  const [prevP, prevT] = await Promise.all([
+    db.prepare('SELECT id, created_at FROM products').all(),
+    db.prepare('SELECT id, created_at FROM transactions').all()
+  ]);
+  const prevProductCreated = new Map((prevP.results || []).map(r => [r.id, r.created_at]));
+  const prevTxCreated = new Map((prevT.results || []).map(r => [r.id, r.created_at]));
+
   const statements = [
     db.prepare('DELETE FROM prescription_items'),
     db.prepare('DELETE FROM prescriptions'),
@@ -258,19 +317,32 @@ async function writeState(db, data){
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(String(now))
   ];
   for (const p of state.products) {
-    statements.push(db.prepare('INSERT INTO products (id, name, stock_kg, cost_price_vnd, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').bind(p.id, p.name, p.stock, p.costPrice, now, now));
+    statements.push(db.prepare('INSERT INTO products (id, name, stock_kg, cost_price_vnd, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').bind(p.id, p.name, p.stock, money(p.costPrice), prevProductCreated.get(p.id) || now, now));
   }
   for (const t of state.transactions) {
-    statements.push(db.prepare('INSERT INTO transactions (id, date, type, product_id, qty_kg, price_vnd, total_vnd, cost_vnd, order_id, order_name, retail, rx, grams, thang, unit_price_vnd, ts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(t.id, t.date, t.type, t.productId, t.qty, t.price, t.total, t.cost, t.orderId, t.orderName, t.retail ? 1 : 0, t.rx ? 1 : 0, t.grams, t.thang, t.unitPrice, t.ts, now));
+    statements.push(db.prepare('INSERT INTO transactions (id, date, type, product_id, qty_kg, price_vnd, total_vnd, cost_vnd, order_id, order_name, retail, rx, grams, thang, unit_price_vnd, ts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(t.id, t.date, t.type, t.productId, t.qty, money(t.price), money(t.total), t.cost == null ? null : money(t.cost), t.orderId, t.orderName, t.retail ? 1 : 0, t.rx ? 1 : 0, t.grams, t.thang, t.unitPrice == null ? null : money(t.unitPrice), t.ts, prevTxCreated.get(t.id) || now));
   }
   for (const r of state.prescriptions) {
-    statements.push(db.prepare('INSERT INTO prescriptions (id, name, total_vnd, thang, updated_at) VALUES (?, ?, ?, ?, ?)').bind(r.id, r.name, r.total, r.thang, r.updatedAt || now));
+    statements.push(db.prepare('INSERT INTO prescriptions (id, name, total_vnd, thang, updated_at) VALUES (?, ?, ?, ?, ?)').bind(r.id, r.name, money(r.total), r.thang, r.updatedAt || now));
     for (const item of r.items) {
       statements.push(db.prepare('INSERT INTO prescription_items (prescription_id, product_id, grams) VALUES (?, ?, ?)').bind(r.id, item.productId, item.grams));
     }
   }
   await db.batch(statements);
   return now;
+}
+
+/* Một lần: dữ liệu cũ tính theo nghìn VND → chuyển sang đồng nguyên.
+   Cờ app_meta.money_unit='dong' để idempotent; lỗi thì ném để fetch trả 500. */
+async function migrateMoneyToDong(d1){
+  const row = await d1.prepare("SELECT value FROM app_meta WHERE key = 'money_unit'").first();
+  if (row && String(row.value) === 'dong') return;
+  await d1.batch([
+    d1.prepare('UPDATE products SET cost_price_vnd = ROUND(cost_price_vnd * 1000)'),
+    d1.prepare('UPDATE transactions SET price_vnd = ROUND(price_vnd * 1000), total_vnd = ROUND(total_vnd * 1000), cost_vnd = ROUND(cost_vnd * 1000), unit_price_vnd = ROUND(unit_price_vnd * 1000)'),
+    d1.prepare('UPDATE prescriptions SET total_vnd = ROUND(total_vnd * 1000)'),
+    d1.prepare("INSERT INTO app_meta (key, value) VALUES ('money_unit', 'dong') ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+  ]);
 }
 
 function jsonRes(obj, status){
@@ -415,6 +487,15 @@ export default {
     const method = request.method;
     const d1 = env && env.DB;
 
+    // ---------- Một lần: chuyển tiền từ đơn vị nghìn sang đồng ----------
+    if (d1) {
+      try {
+        await migrateMoneyToDong(d1);
+      } catch (e) {
+        return jsonRes({ success: false, error: 'Không migrate được dữ liệu' }, 500);
+      }
+    }
+
     // Không cho website khác gọi API (không còn CORS).
     if (method === 'OPTIONS') return new Response(null, { status: 204 });
 
@@ -476,18 +557,26 @@ export default {
           if (checked.errors.length) {
             return jsonRes({ success: false, error: 'Dữ liệu không hợp lệ', details: checked.errors }, 400);
           }
+          const force = request.headers.get('X-Force') === '1';
           const baseHdr = request.headers.get('X-Base-Updated');
-          if (baseHdr !== null && request.headers.get('X-Force') !== '1') {
+          if (!force && baseHdr == null) {
+            return jsonRes({ success: false, error: 'Thiếu X-Base-Updated (hoặc gửi X-Force: 1 để chủ động ghi đè)' }, 428);
+          }
+          if (baseHdr != null && !force) {
             const baseNum = Number(baseHdr);
-            if (Number.isFinite(baseNum)) {
-              const current = await getSourceUpdatedAt(d1);
-              if (current > baseNum) {
-                return jsonRes({ success: false, conflict: true, updatedAt: current }, 409);
-              }
+            if (!Number.isFinite(baseNum)) {
+              return jsonRes({ success: false, error: 'X-Base-Updated không hợp lệ' }, 400);
+            }
+            const current = await getSourceUpdatedAt(d1);
+            if (current > baseNum) {
+              return jsonRes({ success: false, conflict: true, updatedAt: current }, 409);
             }
           }
           const updatedAt = await writeState(d1, checked.state);
-          return jsonRes({ success: true, updatedAt, warnings: checked.warnings.length ? checked.warnings : undefined });
+          const reply = { success: true, updatedAt };
+          if (checked.warnings.length) reply.warnings = checked.warnings;
+          if (checked.stockDrift.length) reply.stockDrift = checked.stockDrift;
+          return jsonRes(reply);
         }
         return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, PUT' } });
       } catch (err) {
