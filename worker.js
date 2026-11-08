@@ -317,10 +317,10 @@ async function writeState(db, data){
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(String(now))
   ];
   for (const p of state.products) {
-    statements.push(db.prepare('INSERT INTO products (id, name, stock_kg, cost_price_vnd, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').bind(p.id, p.name, p.stock, money(p.costPrice), prevProductCreated.get(p.id) || now, now));
+    statements.push(db.prepare('INSERT INTO products (id, name, stock_kg, cost_price_vnd, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').bind(p.id, p.name, p.stock, money(p.costPrice), prevProductCreated.get(p.id) ?? now, now));
   }
   for (const t of state.transactions) {
-    statements.push(db.prepare('INSERT INTO transactions (id, date, type, product_id, qty_kg, price_vnd, total_vnd, cost_vnd, order_id, order_name, retail, rx, grams, thang, unit_price_vnd, ts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(t.id, t.date, t.type, t.productId, t.qty, money(t.price), money(t.total), t.cost == null ? null : money(t.cost), t.orderId, t.orderName, t.retail ? 1 : 0, t.rx ? 1 : 0, t.grams, t.thang, t.unitPrice == null ? null : money(t.unitPrice), t.ts, prevTxCreated.get(t.id) || now));
+    statements.push(db.prepare('INSERT INTO transactions (id, date, type, product_id, qty_kg, price_vnd, total_vnd, cost_vnd, order_id, order_name, retail, rx, grams, thang, unit_price_vnd, ts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(t.id, t.date, t.type, t.productId, t.qty, money(t.price), money(t.total), t.cost == null ? null : money(t.cost), t.orderId, t.orderName, t.retail ? 1 : 0, t.rx ? 1 : 0, t.grams, t.thang, t.unitPrice == null ? null : money(t.unitPrice), t.ts, prevTxCreated.get(t.id) ?? now));
   }
   for (const r of state.prescriptions) {
     statements.push(db.prepare('INSERT INTO prescriptions (id, name, total_vnd, thang, updated_at) VALUES (?, ?, ?, ?, ?)').bind(r.id, r.name, money(r.total), r.thang, r.updatedAt || now));
@@ -364,12 +364,19 @@ function getCookie(request, name){
   }
   return '';
 }
+function timingSafeEqual(a, b){
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
 function validBearer(request, envToken){
   const auth = String(request.headers.get('Authorization') || '').trim();
-  return auth !== '' && auth === 'Bearer ' + envToken;
+  return timingSafeEqual(auth, 'Bearer ' + envToken);
 }
 function validCookie(request, envToken){
-  return String(getCookie(request, 'qlk_token')).trim() === envToken;
+  return timingSafeEqual(String(getCookie(request, 'qlk_token')).trim(), envToken);
 }
 function redirectTo(path){
   return new Response(null, { status: 303, headers: { 'Location': path, 'Cache-Control': 'no-store' } });
@@ -412,7 +419,7 @@ async function handleLogin(request, envToken, env){
     const text = (await request.text()).slice(0, 2048);
     token = String(new URLSearchParams(text).get('token') || '').trim();
   } catch (e) { token = ''; }
-  if (token !== '' && token === envToken) {
+  if (token !== '' && timingSafeEqual(token, envToken)) {
     await clearLoginFails(env, ip);
     return new Response(null, { status: 303, headers: {
       'Location': '/',
@@ -487,15 +494,6 @@ export default {
     const method = request.method;
     const d1 = env && env.DB;
 
-    // ---------- Một lần: chuyển tiền từ đơn vị nghìn sang đồng ----------
-    if (d1) {
-      try {
-        await migrateMoneyToDong(d1);
-      } catch (e) {
-        return jsonRes({ success: false, error: 'Không migrate được dữ liệu' }, 500);
-      }
-    }
-
     // Không cho website khác gọi API (không còn CORS).
     if (method === 'OPTIONS') return new Response(null, { status: 204 });
 
@@ -532,6 +530,16 @@ export default {
       return new Response('User-agent: *\nDisallow: /\n', {
         headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' }
       });
+    }
+
+    // ---------- Một lần: chuyển tiền từ đơn vị nghìn sang đồng ----------
+    // Chỉ chạy cho người dùng đã xác thực; ẩn danh không tới được nhánh này.
+    if (d1) {
+      try {
+        await migrateMoneyToDong(d1);
+      } catch (e) {
+        return jsonRes({ success: false, error: 'Không migrate được dữ liệu' }, 500);
+      }
     }
 
     // ---------- Đồng bộ dữ liệu D1 ----------
