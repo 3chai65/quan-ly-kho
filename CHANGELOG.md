@@ -5,6 +5,25 @@ Mọi thay đổi đáng chú ý của dự án **Quản Lý Kho** được ghi 
 Định dạng dựa trên [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/) và
 tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.16.1] - 2026-11-09
+
+### Fixed
+- `scripts/backup-to-sql.mjs`: sau lệnh `DELETE FROM app_meta` phải chèn lại khóa
+  `money_unit = 'dong'`. Thiếu khóa này khi restore SQL vào D1 khiến worker chạy
+  `migrateMoneyToDong` (idempotent nhờ khóa) và **nhân `×1000` giá tiền lần nữa** →
+  toàn bộ vốn/hàng bán bị phình. Đã sửa + verify bằng cách chạy script với backup thật.
+
+### Added
+- `GET /api/version`: endpoint polling nhẹ (chỉ đọc `app_meta.source_updated_at`) cho
+  client tự làm mới — tiết kiệm D1 reads/bandwidth so với kéo full snapshot mỗi 15s.
+
+### Changed
+- `autoRefresh` (client): gọi `GET /api/version` trước, chỉ khi có `updatedAt` mới hơn
+  mới kéo `GET /api/state` — đúng bản local 2.6.x.
+
+### Test
+- Bộ test: **40/40 pass** (cập nhật từ mốc 33).
+
 ## [1.16.0] - 2026-11-08
 
 ### Đồng bộ & API
@@ -22,7 +41,7 @@ tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 
 ### Refactor & test
 - **Gỡ hoàn tác chuẩn hoá (migUndo):** loại bỏ logic hoàn tác chuẩn hoá cũ.
-- **Test 33 (xem lịch sử):** bộ test tăng lên **33** pass.
+- **Test:** bộ test đạt **40/40** pass.
 
 ## [1.15.0] - 2026-11-08
 

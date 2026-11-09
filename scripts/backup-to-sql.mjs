@@ -71,4 +71,5 @@ for (const r of prescriptions) {
 
 add(`INSERT INTO app_meta (key, value) VALUES ('schema_version', '1');`);
 add(`INSERT INTO app_meta (key, value) VALUES ('source_updated_at', '${esc(sourceUpdatedAt)}');`);
+add(`INSERT INTO app_meta (key, value) VALUES ('money_unit', 'dong');`);
 process.stdout.write(lines.join('\n') + '\n');

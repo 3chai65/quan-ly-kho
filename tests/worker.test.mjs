@@ -62,6 +62,7 @@ globalThis.__test = {
   remedyMates: remedyMates, scaledRemedyCost: scaledRemedyCost,
   backupBeforeRestore: backupBeforeRestore, downloadBackup: downloadBackup,
   pushState: pushState, pullState: pullState, cloudConflict: cloudConflict, discardUnsynced: discardUnsynced,
+  autoRefresh: autoRefresh,
   setConflictOpen: function(v){ conflictOpen = !!v; },
   setSyncErrorShown: function(v){ syncErrorShown = !!v; },
   isSyncRejected: function(){ return syncRejected; },
@@ -648,6 +649,18 @@ test('GET /api/state trả data có moneyUnit dong', async () => {
   assert.equal(body.data.moneyUnit, 'dong');
 });
 
+test('GET /api/version trả updatedAt cho client polling nhẹ', async () => {
+  const d1 = fakeD1({ sourceUpdatedAt: 123456 });
+  const res = await worker.fetch(new Request('https://kho.test/api/version', {
+    headers: { Authorization: 'Bearer test-token' }
+  }), { APP_TOKEN: 'test-token', DB: d1 });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.equal(Number(body.data.updatedAt), 123456);
+  assert.ok(d1.sqls.some(sql => /FROM app_meta/.test(sql) && /source_updated_at/.test(sql)));
+});
+
 /* ------------------------------------------------------------------ */
 /* Script chuyển backup JSON sang SQL                                  */
 /* ------------------------------------------------------------------ */
@@ -937,4 +950,25 @@ test('pushState 5xx/network: lên lịch retry 4000ms; PUT thành công reset de
   client.setSyncRetryDelay(16000);
   await client.pushState(false, false);
   assert.equal(client.getSyncRetryDelay(), 4000);
+});
+
+test('autoRefresh: gọi /api/version trước, chỉ khi có bản mới mới kéo /api/state', async () => {
+  const calls = [];
+  const fetchStub = async (url, opts = {}) => {
+    calls.push(String(url));
+    if (String(url).indexOf('/api/version') >= 0) {
+      return { status: 200, json: async () => ({ success: true, data: { updatedAt: 5 } }) };
+    }
+    return { status: 200, json: async () => ({ success: true, data: { products: [], transactions: [], prescriptions: [], updatedAt: 5 } }) };
+  };
+  const client = loadClient({ fetch: fetchStub });
+  client.setDb({ products: [], transactions: [], prescriptions: [], updatedAt: 10 });
+  client.setBase(10);
+  client.setDirty(false);
+  client.setConflictOpen(false);
+  const ok = await client.autoRefresh();
+  assert.equal(ok, false);
+  // chỉ /api/version được gọi (bản 5 không mới hơn cloudBase 10 → không kéo /api/state)
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].includes('/api/version'));
 });

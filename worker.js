@@ -542,6 +542,20 @@ export default {
       }
     }
 
+    // ---------- Phiên bản dữ liệu: polling nhẹ cho autoRefresh ----------
+    // Chỉ đọc 1 dòng app_meta (source_updated_at) — không kéo toàn bộ snapshot,
+    // để client có thể kiểm tra "có bản mới?" trước khi gọi GET /api/state.
+    if (url.pathname === '/api/version') {
+      try {
+        if (!d1) return jsonRes({ success: false, error: 'D1 chưa được cấu hình' }, 503);
+        const updatedAt = await getSourceUpdatedAt(d1);
+        return jsonRes({ success: true, data: { updatedAt } });
+      } catch (e) {
+        console.error('/api/version', e);
+        return jsonRes({ success: false, error: 'Không đọc được phiên bản' }, 500);
+      }
+    }
+
     // ---------- Đồng bộ dữ liệu D1 ----------
     if (url.pathname === '/api/state') {
       try {

@@ -3885,28 +3885,40 @@ function busyEditing(){
 function autoRefresh(){
   if (refreshing || dirty || conflictOpen || doc.hidden || busyEditing()) return Promise.resolve(false);
   refreshing = true;
-  return authFetch('/api/state?t=' + Date.now())
+  /* Polling nhẹ: /api/version chỉ đọc 1 dòng app_meta → nếu không có bản mới
+     thì không cần kéo toàn bộ snapshot qua /api/state (tiết kiệm D1 reads + bandwidth). */
+  return authFetch('/api/version?t=' + Date.now())
     .then(function(r){ return r ? r.json() : null; })
     .then(function(d){
       refreshing = false;
       /* Trong lúc chờ máy chủ, người dùng có thể bắt đầu sửa hoặc mở giỏ hàng.
          Không ghi đè bản đang làm. */
       if (dirty || conflictOpen || busyEditing()) return false;
-      var server = d && d.success ? sanitize(d.data) : null;
+      var server = d && d.success ? (d.data || null) : null;
       if (!server) return false;
-      noteStockWarnings(d && d.stockDrift);
-      if (num(server.updatedAt) > num(cloudBase)) {
-        cloudBase = num(server.updatedAt);
-        db = server;
-        dirty = false;
-        saveLocal();
-        renderAll();
-        if (typeof orderCur !== 'undefined' && orderCur) renderOrder();
-        renderSyncBadge();
-        toast('Đã cập nhật dữ liệu mới từ thiết bị khác');
-        return true;
-      }
-      return false;
+      if (!(num(server.updatedAt) > num(cloudBase))) return false;
+      /* Bản server mới hơn → kéo đầy đủ snapshot. */
+      return authFetch('/api/state?t=' + Date.now())
+        .then(function(r){ return r ? r.json() : null; })
+        .then(function(sd){
+          if (dirty || conflictOpen || busyEditing()) return false;
+          var s = sd && sd.success ? sanitize(sd.data) : null;
+          if (!s) return false;
+          noteStockWarnings(sd && sd.stockDrift);
+          if (num(s.updatedAt) > num(cloudBase)) {
+            cloudBase = num(s.updatedAt);
+            db = s;
+            dirty = false;
+            saveLocal();
+            renderAll();
+            if (typeof orderCur !== 'undefined' && orderCur) renderOrder();
+            renderSyncBadge();
+            toast('Đã cập nhật dữ liệu mới từ thiết bị khác');
+            return true;
+          }
+          return false;
+        })
+        .catch(function(){ return false; });
     })
     .catch(function(){ refreshing = false; return false; });
 }
@@ -4422,7 +4434,8 @@ globalThis.__test = Object.assign(globalThis.__test || {}, {
   scaledRemedyCost: scaledRemedyCost,
   discardUnsynced: discardUnsynced,
   pushState: pushState,
-  pullState: pullState
+  pullState: pullState,
+  autoRefresh: autoRefresh
 });
 
 })();
